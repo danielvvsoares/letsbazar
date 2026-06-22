@@ -461,6 +461,32 @@
     .adm-empty { text-align: center; padding: 40px 16px; color: var(--cinza); }
     .adm-empty .ico { font-size: 2.4rem; display: block; margin-bottom: 8px; }
 
+    /* bulk action bar */
+    .bulk-bar {
+      display: none; align-items: center; gap: 10px;
+      background: var(--escuro); color: #fff;
+      padding: 10px 16px; border-radius: 10px; margin-bottom: 10px;
+      font-size: 0.85rem; font-weight: 600; animation: fadeInUp 0.2s ease;
+    }
+    .bulk-bar.visivel { display: flex; }
+    .bulk-bar span { flex: 1; }
+    .bulk-btn-del {
+      padding: 7px 14px; background: #C62828; color: #fff;
+      border: none; border-radius: 7px; font-family: inherit;
+      font-size: 0.8rem; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; gap: 5px; transition: filter 0.15s;
+    }
+    .bulk-btn-del:hover { filter: brightness(1.15); }
+    .bulk-btn-cancel {
+      padding: 7px 12px; background: rgba(255,255,255,0.15); color: #fff;
+      border: none; border-radius: 7px; font-family: inherit;
+      font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: background 0.15s;
+    }
+    .bulk-btn-cancel:hover { background: rgba(255,255,255,0.25); }
+
+    /* checkbox */
+    .adm-chk { width: 16px; height: 16px; cursor: pointer; accent-color: var(--roxo); }
+
     /* form */
     .adm-field { margin-bottom: 13px; }
     .adm-field label {
@@ -755,9 +781,17 @@
             <option value="infantil">🧸 Infantil</option>
           </select>
         </div>
+        <div class="bulk-bar" id="bulkBarProd">
+          <span id="bulkCountProd">0 selecionados</span>
+          <button class="bulk-btn-del" onclick="adm_excluirSelecionados()">🗑️ Excluir selecionados</button>
+          <button class="bulk-btn-cancel" onclick="adm_limparSelecao('prod')">✕ Cancelar</button>
+        </div>
         <div class="adm-table-wrap">
           <table class="adm-table">
-            <thead><tr><th></th><th>Nome</th><th>Cat.</th><th>Preço</th><th>Estq.</th><th>Badge</th><th></th></tr></thead>
+            <thead><tr>
+              <th><input type="checkbox" class="adm-chk" id="chkTodosProd" onchange="adm_selecionarTodos('prod',this.checked)"/></th>
+              <th></th><th>Nome</th><th>Cat.</th><th>Preço</th><th>Estq.</th><th>Badge</th><th></th>
+            </tr></thead>
             <tbody id="admTBodyProd"></tbody>
           </table>
         </div>
@@ -791,9 +825,19 @@
     <div class="adm-page" id="adm-page-estoque">
       <div class="adm-card">
         <div class="adm-card-header"><span class="adm-card-title">📋 Estoque</span></div>
+        <div style="padding:0 16px">
+          <div class="bulk-bar" id="bulkBarEst">
+            <span id="bulkCountEst">0 selecionados</span>
+            <button class="bulk-btn-del" onclick="adm_excluirSelecionadosEst()">🗑️ Excluir selecionados</button>
+            <button class="bulk-btn-cancel" onclick="adm_limparSelecao('est')">✕ Cancelar</button>
+          </div>
+        </div>
         <div class="adm-table-wrap">
           <table class="adm-table">
-            <thead><tr><th></th><th>Produto</th><th>Cat.</th><th>Qtd</th><th>Atualizar</th></tr></thead>
+            <thead><tr>
+              <th><input type="checkbox" class="adm-chk" id="chkTodosEst" onchange="adm_selecionarTodos('est',this.checked)"/></th>
+              <th></th><th>Produto</th><th>Cat.</th><th>Qtd</th><th>Atualizar</th>
+            </tr></thead>
             <tbody id="admTBodyEst"></tbody>
           </table>
         </div>
@@ -1182,9 +1226,10 @@ function adm_renderProdutos() {
   const cat   = document.getElementById('admFiltrocat')?.value||'';
   const lista = getProd().filter(p=>(!busca||p.nome.toLowerCase().includes(busca))&&(!cat||p.cat===cat));
   document.getElementById('admTBodyProd').innerHTML = lista.length===0
-    ? `<tr><td colspan="7"><div class="adm-empty"><span class="ico">📦</span>Nenhum produto.</div></td></tr>`
+    ? `<tr><td colspan="8"><div class="adm-empty"><span class="ico">📦</span>Nenhum produto.</div></td></tr>`
     : lista.map(p=>`
       <tr>
+        <td><input type="checkbox" class="adm-chk chk-prod" data-id="${p.id}" onchange="adm_atualizarBulk('prod')"/></td>
         <td style="font-size:1.3rem">${p.emoji}</td>
         <td><strong>${p.nome}</strong></td>
         <td><span class="adm-badge badge-cat">${catL(p.cat)}</span></td>
@@ -1196,6 +1241,8 @@ function adm_renderProdutos() {
           <button class="adm-btn-ic adm-btn-del"  onclick="adm_excluir(${p.id})">🗑️</button>
         </div></td>
       </tr>`).join('');
+  // Limpa barra ao re-renderizar
+  adm_limparSelecao('prod');
 }
 
 let _editId = null;
@@ -1283,6 +1330,7 @@ function adm_renderEstoque() {
     .sort((a,b)=>(a.estoque||0)-(b.estoque||0))
     .map(p=>`
       <tr>
+        <td><input type="checkbox" class="adm-chk chk-est" data-id="${p.id}" onchange="adm_atualizarBulk('est')"/></td>
         <td style="font-size:1.2rem">${p.emoji}</td>
         <td><strong>${p.nome}</strong></td>
         <td><span class="adm-badge badge-cat">${catL(p.cat)}</span></td>
@@ -1294,6 +1342,7 @@ function adm_renderEstoque() {
             style="padding:5px 10px;background:var(--verde);color:#fff;border:none;border-radius:7px;font-family:inherit;font-weight:700;cursor:pointer;font-size:0.78rem">✓</button>
         </div></td>
       </tr>`).join('');
+  adm_limparSelecao('est');
 }
 
 function adm_salvarEst(id) {
@@ -1330,6 +1379,53 @@ function adm_limparPedidos() {
 function adm_resetarProdutos() {
   if (!confirm('Restaurar produtos padrão?')) return;
   save(K.prod, PRODUTOS_DEFAULT); adm_renderProdutos(); alert('✅ Produtos restaurados.');
+}
+
+// ── SELEÇÃO EM MASSA ────────────────────────────────────────────
+function adm_getSelecionados(tipo) {
+  return [...document.querySelectorAll(`.chk-${tipo}:checked`)].map(c=>Number(c.dataset.id));
+}
+
+function adm_atualizarBulk(tipo) {
+  const ids = adm_getSelecionados(tipo);
+  const bar = document.getElementById(`bulkBar${tipo==='prod'?'Prod':'Est'}`);
+  const cnt = document.getElementById(`bulkCount${tipo==='prod'?'Prod':'Est'}`);
+  cnt.textContent = `${ids.length} selecionado${ids.length!==1?'s':''}`;
+  bar.classList.toggle('visivel', ids.length > 0);
+  // Atualiza "selecionar todos"
+  const todos = document.querySelectorAll(`.chk-${tipo}`);
+  const chkTodos = document.getElementById(`chkTodos${tipo==='prod'?'Prod':'Est'}`);
+  if(chkTodos) chkTodos.indeterminate = ids.length > 0 && ids.length < todos.length;
+  if(chkTodos) chkTodos.checked = ids.length > 0 && ids.length === todos.length;
+}
+
+function adm_selecionarTodos(tipo, checked) {
+  document.querySelectorAll(`.chk-${tipo}`).forEach(c=>c.checked=checked);
+  adm_atualizarBulk(tipo);
+}
+
+function adm_limparSelecao(tipo) {
+  document.querySelectorAll(`.chk-${tipo}`).forEach(c=>c.checked=false);
+  const chkTodos = document.getElementById(`chkTodos${tipo==='prod'?'Prod':'Est'}`);
+  if(chkTodos) { chkTodos.checked=false; chkTodos.indeterminate=false; }
+  const bar = document.getElementById(`bulkBar${tipo==='prod'?'Prod':'Est'}`);
+  if(bar) bar.classList.remove('visivel');
+}
+
+function adm_excluirSelecionados() {
+  const ids = adm_getSelecionados('prod');
+  if(!ids.length) return;
+  if(!confirm(`Excluir ${ids.length} produto${ids.length!==1?'s':''}? Esta ação não pode ser desfeita.`)) return;
+  save(K.prod, getProd().filter(p=>!ids.includes(p.id)));
+  adm_renderProdutos(); adm_renderDash();
+}
+
+function adm_excluirSelecionadosEst() {
+  const ids = adm_getSelecionados('est');
+  if(!ids.length) return;
+  if(!confirm(`Excluir ${ids.length} produto${ids.length!==1?'s':''}? Esta ação não pode ser desfeita.`)) return;
+  save(K.prod, getProd().filter(p=>!ids.includes(p.id)));
+  adm_renderEstoque(); adm_renderDash();
 }
 
 function adm_flash(id) {
