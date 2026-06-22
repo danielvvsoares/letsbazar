@@ -640,6 +640,90 @@
       .adm-form-row { grid-template-columns: 1fr; }
       .stat-value { font-size: 1.4rem; }
     }
+
+    /* ════════════════════════════════════════════════
+       LOGIN
+    ════════════════════════════════════════════════ */
+    #loginView {
+      min-height: 100vh;
+      background: linear-gradient(135deg, var(--escuro) 0%, #2D1B6B 50%, var(--escuro) 100%);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .login-card {
+      background: #fff; border-radius: 24px;
+      width: 100%; max-width: 400px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.35);
+      overflow: hidden;
+      animation: fadeInUp 0.35s ease;
+    }
+    .login-header {
+      background: linear-gradient(135deg, var(--roxo), var(--rosa));
+      padding: 32px 24px 28px; text-align: center; color: #fff;
+    }
+    .login-header h1 { font-size: 1.6rem; font-weight: 800; }
+    .login-header h1 span { color: var(--amarelo); }
+    .login-header p { font-size: 0.85rem; opacity: 0.85; margin-top: 6px; }
+    .login-body { padding: 28px 24px; }
+    .login-field { margin-bottom: 16px; }
+    .login-field label {
+      display: block; font-size: 0.72rem; font-weight: 700;
+      color: var(--cinza); margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .login-input-wrap { position: relative; }
+    .login-inp {
+      width: 100%; padding: 12px 42px 12px 14px;
+      border: 2px solid var(--border); border-radius: 10px;
+      font-family: inherit; font-size: 0.95rem; color: var(--escuro);
+      outline: none; transition: border-color 0.2s;
+    }
+    .login-inp:focus { border-color: var(--roxo); }
+    .login-eye {
+      position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--cinza);
+    }
+    .login-btn {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, var(--roxo), var(--rosa));
+      color: #fff; border: none; border-radius: 12px;
+      font-family: inherit; font-size: 1rem; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+      transition: filter 0.18s, transform 0.18s;
+    }
+    .login-btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .login-erro {
+      background: #FFE8E8; color: #C62828; border: 1px solid #FFCDD2;
+      border-radius: 8px; padding: 10px 14px; font-size: 0.82rem;
+      font-weight: 600; margin-bottom: 14px; display: none;
+    }
+    .login-ok {
+      background: #E8FFF6; color: #00695C; border: 1px solid #B2DFDB;
+      border-radius: 8px; padding: 10px 14px; font-size: 0.82rem;
+      font-weight: 600; margin-bottom: 14px; display: none;
+    }
+    .login-footer {
+      padding: 0 24px 24px; text-align: center;
+    }
+    .login-toggle {
+      background: none; border: none; font-family: inherit;
+      color: var(--roxo); font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; text-decoration: underline;
+    }
+    .login-back {
+      display: block; margin-top: 14px; color: var(--cinza);
+      font-size: 0.8rem; cursor: pointer; background: none; border: none;
+      font-family: inherit; text-decoration: underline;
+    }
+    .login-strength {
+      height: 4px; border-radius: 4px; margin-top: 6px;
+      background: var(--border); overflow: hidden;
+    }
+    .login-strength-bar {
+      height: 100%; border-radius: 4px; width: 0%;
+      transition: width 0.3s, background 0.3s;
+    }
   </style>
 </head>
 <body>
@@ -718,6 +802,93 @@
 
 
 <!-- ════════════════════════════════════════
+  LOGIN
+════════════════════════════════════════ -->
+<div id="loginView" style="display:none">
+  <div class="login-card">
+    <div class="login-header">
+      <h1>✨ Let's <span>Bazar</span></h1>
+      <p id="loginHeaderTxt">Área restrita — funcionários</p>
+    </div>
+    <div class="login-body">
+      <div class="login-erro" id="loginErro"></div>
+      <div class="login-ok"   id="loginOk"></div>
+
+      <!-- FORM: CONFIGURAR GITHUB TOKEN -->
+      <div id="formGhSetup" style="display:none">
+        <p style="font-size:0.82rem;color:var(--cinza);margin-bottom:16px;line-height:1.5">
+          Para guardar as credenciais no GitHub, informe seu <strong>Personal Access Token</strong>.<br>
+          <a href="https://github.com/settings/tokens" target="_blank" style="color:var(--roxo)">Gerar token aqui</a> → Fine-grained → selecione o repo → permissão <strong>Contents: Read & Write</strong>.
+        </p>
+        <div class="login-field">
+          <label>Token do GitHub (ghp_...)</label>
+          <div class="login-input-wrap">
+            <input class="login-inp" type="password" id="ghToken" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
+            <button class="login-eye" type="button" onclick="auth_toggleSenha('ghToken',this)">👁️</button>
+          </div>
+        </div>
+        <div class="login-field">
+          <label>Repositório (usuário/repo)</label>
+          <input class="login-inp" type="text" id="ghRepo" value="danielvvsoares/letsbazar" autocomplete="off"/>
+        </div>
+        <div class="login-field">
+          <label>Branch</label>
+          <input class="login-inp" type="text" id="ghBranch" value="main" autocomplete="off"/>
+        </div>
+        <button class="login-btn" id="btnGhSalvar" onclick="auth_salvarGh()">🔗 Conectar ao GitHub</button>
+      </div>
+
+      <!-- FORM LOGIN -->
+      <div id="formLogin" style="display:none">
+        <div class="login-field">
+          <label>Usuário</label>
+          <input class="login-inp" type="text" id="loginUser" placeholder="Seu usuário" autocomplete="username"/>
+        </div>
+        <div class="login-field">
+          <label>Senha</label>
+          <div class="login-input-wrap">
+            <input class="login-inp" type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')auth_entrar()"/>
+            <button class="login-eye" type="button" onclick="auth_toggleSenha('loginPass',this)">👁️</button>
+          </div>
+        </div>
+        <button class="login-btn" id="btnEntrar" onclick="auth_entrar()">🔐 Entrar</button>
+      </div>
+
+      <!-- FORM CRIAR ACESSO -->
+      <div id="formCriar" style="display:none">
+        <div class="login-field">
+          <label>Nome de usuário</label>
+          <input class="login-inp" type="text" id="criarUser" placeholder="Ex: maria" autocomplete="username"/>
+        </div>
+        <div class="login-field">
+          <label>Senha (mín. 6 caracteres)</label>
+          <div class="login-input-wrap">
+            <input class="login-inp" type="password" id="criarPass" placeholder="••••••••" oninput="auth_forca(this.value)" autocomplete="new-password"/>
+            <button class="login-eye" type="button" onclick="auth_toggleSenha('criarPass',this)">👁️</button>
+          </div>
+          <div class="login-strength"><div class="login-strength-bar" id="forcaBar"></div></div>
+        </div>
+        <div class="login-field">
+          <label>Confirmar senha</label>
+          <div class="login-input-wrap">
+            <input class="login-inp" type="password" id="criarPass2" placeholder="Repita a senha" autocomplete="new-password" onkeydown="if(event.key==='Enter')auth_criar()"/>
+            <button class="login-eye" type="button" onclick="auth_toggleSenha('criarPass2',this)">👁️</button>
+          </div>
+        </div>
+        <button class="login-btn" id="btnCriar" onclick="auth_criar()">✅ Criar acesso</button>
+      </div>
+    </div>
+    <div class="login-footer">
+      <span id="loginToggleTxt" style="color:var(--cinza);font-size:0.85rem"></span>
+      <button class="login-toggle" id="loginToggleBtn" onclick="auth_alternarForm()" style="display:none"></button>
+      <br>
+      <button class="login-back" onclick="showStore()">← Voltar à loja</button>
+      <button class="login-back" id="btnReconfGh" onclick="auth_mostrarForm('gh')" style="display:none">⚙️ Reconfigurar GitHub</button>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════
   ADMIN
 ════════════════════════════════════════ -->
 <div id="adminView" style="display:none">
@@ -725,6 +896,7 @@
   <header class="app-header">
     <button class="adm-logo" onclick="showStore()">✨ Let's <span>Bazar</span></button>
     <span class="adm-page-title" id="admPageTitle">Painel</span>
+    <button class="adm-back" onclick="auth_sair()" title="Sair" style="margin-left:6px">🚪</button>
     <button class="adm-back" onclick="showStore()" title="Voltar à loja">🏪</button>
   </header>
 
@@ -857,6 +1029,21 @@
         <div class="adm-alert-ok" id="okInfo">✅ Salvo!</div>
       </div>
       <div class="adm-cfg-section">
+        <h3>👥 Usuários do Painel</h3>
+        <div id="cfgUsuariosLista" style="margin-bottom:14px"></div>
+        <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+          <p style="font-size:0.78rem;color:var(--cinza);margin-bottom:10px;font-weight:600">Adicionar usuário</p>
+          <div class="adm-form-row">
+            <div class="adm-field"><label>Usuário</label><input type="text" id="novoUser" placeholder="Ex: maria"/></div>
+            <div class="adm-field"><label>Senha</label><input type="password" id="novaSenha" placeholder="Min. 6 chars"/></div>
+          </div>
+          <button class="adm-btn-cfg" onclick="adm_criarUsuario()" style="margin-top:0">➕ Adicionar</button>
+          <div class="adm-alert-ok" id="okUsuario">✅ Usuário salvo no GitHub!</div>
+          <div id="erroUsuario" style="display:none;background:#FFE8E8;color:#C62828;border:1px solid #FFCDD2;border-radius:8px;padding:8px 13px;font-size:0.8rem;font-weight:600;margin-top:10px"></div>
+        </div>
+      </div>
+
+      <div class="adm-cfg-section">
         <h3>🗑️ Dados</h3>
         <p style="color:var(--cinza);font-size:0.82rem;margin-bottom:12px">Ações irreversíveis — use com cuidado.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -979,25 +1166,246 @@ const getPed  = () => ls(K.ped)  || [];
 const getCfg  = () => Object.assign({}, CFG_DEF, ls(K.cfg)||{});
 
 // ── ROTEAMENTO ───────────────────────────────────────────────────
+const VIEWS = ['storeView','loginView','adminView'];
+function _showOnly(id) {
+  VIEWS.forEach(v => {
+    const el = document.getElementById(v);
+    el.style.display = v===id ? (id==='storeView'?'':'block') : 'none';
+  });
+}
+
 function showStore() {
-  document.getElementById('storeView').style.display = '';
-  document.getElementById('adminView').style.display = 'none';
+  _showOnly('storeView');
   document.body.style.background = 'var(--claro)';
   history.replaceState(null,'','#');
-  // Recarrega produtos caso admin tenha editado
-  try {
-    const fresh = ls(K.prod);
-    if (fresh) { produtos = fresh; renderProdutos(); }
-  } catch(e) {}
+  try { const fresh = ls(K.prod); if(fresh){produtos=fresh;renderProdutos();} } catch(e){}
 }
 
 function showAdmin() {
-  document.getElementById('storeView').style.display = 'none';
-  document.getElementById('adminView').style.display = 'block';
+  const ok = sessionStorage.getItem('letsbazar_sess') === 'ok';
+  if (!ok) { _mostrarLogin(); return; }
+  _abrirAdmin();
+}
+
+function _abrirAdmin() {
+  _showOnly('adminView');
   document.body.style.background = 'var(--bg)';
   history.replaceState(null,'','#admin');
   adm_renderDash();
   adm_atualizarBadge();
+}
+
+async function _mostrarLogin() {
+  _showOnly('loginView');
+  document.body.style.background = 'var(--escuro)';
+  history.replaceState(null,'','#admin');
+  // 1) Tem token configurado?
+  const ghCfg = ls('letsbazar_gh');
+  if (!ghCfg || !ghCfg.token) { auth_mostrarForm('gh'); return; }
+  // 2) Tenta buscar auth.json do GitHub
+  try {
+    const data = await gh_fetchAuth();
+    const users = data.users || {};
+    auth_mostrarForm(Object.keys(users).length === 0 ? 'criar' : 'login');
+  } catch(e) {
+    auth_mostrarForm('gh');
+    auth_erro('Não foi possível conectar ao GitHub. Verifique o token.');
+  }
+}
+
+// ── GITHUB API ────────────────────────────────────────────────────
+const K_GH = 'letsbazar_gh';
+const GH_FILE = 'auth.json';
+
+function getGhCfg() { return ls(K_GH) || {}; }
+
+async function gh_fetchAuth() {
+  const { owner, repo, branch='main' } = getGhCfg();
+  const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${GH_FILE}?t=${Date.now()}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+async function gh_updateAuth(data) {
+  const { owner, repo, branch='main', token } = getGhCfg();
+  const api = `https://api.github.com/repos/${owner}/${repo}/contents/${GH_FILE}`;
+  const headers = { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' };
+  // Busca SHA atual
+  let sha = null;
+  try {
+    const r = await fetch(api, { headers });
+    if (r.ok) { const j = await r.json(); sha = j.sha; }
+  } catch(e) {}
+  const content = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)+'\n')));
+  const body = { message: 'Atualizar auth.json [letsbazar]', content, branch };
+  if (sha) body.sha = sha;
+  const r = await fetch(api, { method:'PUT', headers, body:JSON.stringify(body) });
+  if (!r.ok) { const e = await r.json(); throw new Error(e.message||'Erro na API do GitHub'); }
+}
+
+// ── AUTH UI ───────────────────────────────────────────────────────
+let _formAtual = 'login';
+
+function auth_mostrarForm(qual) {
+  _formAtual = qual;
+  ['formGhSetup','formLogin','formCriar'].forEach(id =>
+    document.getElementById(id).style.display = 'none'
+  );
+  document.getElementById('loginErro').style.display = 'none';
+  document.getElementById('loginOk').style.display   = 'none';
+
+  const cfg = getGhCfg();
+  const btnReconf = document.getElementById('btnReconfGh');
+  const toggleBtn = document.getElementById('loginToggleBtn');
+  const toggleTxt = document.getElementById('loginToggleTxt');
+
+  if (qual === 'gh') {
+    document.getElementById('formGhSetup').style.display = '';
+    document.getElementById('loginHeaderTxt').textContent = 'Configurar acesso ao GitHub';
+    if (cfg.token) {
+      document.getElementById('ghToken').value  = cfg.token;
+      document.getElementById('ghRepo').value   = cfg.owner+'/'+cfg.repo;
+      document.getElementById('ghBranch').value = cfg.branch||'main';
+    }
+    btnReconf.style.display = 'none';
+    toggleBtn.style.display = 'none'; toggleTxt.textContent = '';
+  } else if (qual === 'login') {
+    document.getElementById('formLogin').style.display = '';
+    document.getElementById('loginHeaderTxt').textContent = 'Área restrita — funcionários';
+    btnReconf.style.display = '';
+    toggleBtn.style.display = ''; toggleBtn.textContent = '+ Criar novo usuário';
+    toggleTxt.textContent = '';
+  } else { // criar
+    document.getElementById('formCriar').style.display = '';
+    document.getElementById('loginHeaderTxt').textContent = 'Criar acesso';
+    btnReconf.style.display = '';
+    toggleBtn.style.display = ''; toggleBtn.textContent = 'Já tenho acesso';
+    toggleTxt.textContent = '';
+  }
+}
+
+function auth_alternarForm() {
+  auth_mostrarForm(_formAtual === 'login' ? 'criar' : 'login');
+}
+
+async function auth_salvarGh() {
+  const tokenRaw = document.getElementById('ghToken').value.trim();
+  const repoRaw  = document.getElementById('ghRepo').value.trim();
+  const branch   = document.getElementById('ghBranch').value.trim() || 'main';
+  if (!tokenRaw || !repoRaw) { auth_erro('Preencha token e repositório.'); return; }
+  const parts = repoRaw.split('/');
+  if (parts.length !== 2) { auth_erro('Repositório deve ser no formato usuário/repo.'); return; }
+  const [owner, repo] = parts;
+  const btn = document.getElementById('btnGhSalvar');
+  btn.disabled = true; btn.textContent = 'Conectando...';
+  try {
+    save(K_GH, { owner, repo, branch, token: tokenRaw });
+    // Testa conexão
+    let data;
+    try { data = await gh_fetchAuth(); }
+    catch(e) {
+      // Se auth.json não existe ainda, cria
+      if (e.message.includes('404') || e.message.includes('HTTP 404')) {
+        await gh_updateAuth({ users: {} });
+        data = { users: {} };
+      } else throw e;
+    }
+    const users = data.users || {};
+    auth_sucesso('✅ Conectado! Carregando...');
+    setTimeout(() => auth_mostrarForm(Object.keys(users).length === 0 ? 'criar' : 'login'), 800);
+  } catch(e) {
+    auth_erro('Erro ao conectar: ' + e.message);
+    localStorage.removeItem(K_GH);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔗 Conectar ao GitHub';
+  }
+}
+
+async function auth_hash(txt) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(txt));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function auth_toggleSenha(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  inp.type = inp.type==='password' ? 'text' : 'password';
+  btn.textContent = inp.type==='password' ? '👁️' : '🙈';
+}
+
+function auth_forca(val) {
+  const bar = document.getElementById('forcaBar');
+  let s = 0;
+  if(val.length>=6) s++; if(val.length>=10) s++;
+  if(/[A-Z]/.test(val)) s++; if(/[0-9]/.test(val)) s++; if(/[^A-Za-z0-9]/.test(val)) s++;
+  const c=['#C62828','#E65100','#F9A825','#2E7D32','#1B5E20'];
+  bar.style.width=`${s*20}%`; bar.style.background=c[s-1]||'var(--border)';
+}
+
+function auth_erro(msg) {
+  document.getElementById('loginErro').textContent = msg;
+  document.getElementById('loginErro').style.display = 'block';
+  document.getElementById('loginOk').style.display   = 'none';
+}
+function auth_sucesso(msg) {
+  document.getElementById('loginOk').textContent = msg;
+  document.getElementById('loginOk').style.display   = 'block';
+  document.getElementById('loginErro').style.display = 'none';
+}
+
+async function auth_entrar() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if (!user || !pass) { auth_erro('Preencha usuário e senha.'); return; }
+  const btn = document.getElementById('btnEntrar');
+  btn.disabled = true; btn.textContent = 'Verificando...';
+  try {
+    const data = await gh_fetchAuth();
+    const users = data.users || {};
+    if (!users[user]) { auth_erro('Usuário não encontrado.'); return; }
+    const hash = await auth_hash(pass);
+    if (users[user] !== hash) { auth_erro('Senha incorreta.'); return; }
+    sessionStorage.setItem('letsbazar_sess','ok');
+    sessionStorage.setItem('letsbazar_user', user);
+    _abrirAdmin();
+  } catch(e) {
+    auth_erro('Erro ao verificar: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔐 Entrar';
+  }
+}
+
+async function auth_criar() {
+  const user  = document.getElementById('criarUser').value.trim();
+  const pass  = document.getElementById('criarPass').value;
+  const pass2 = document.getElementById('criarPass2').value;
+  if (!user)          { auth_erro('Informe um nome de usuário.'); return; }
+  if (pass.length < 6){ auth_erro('Senha precisa ter pelo menos 6 caracteres.'); return; }
+  if (pass !== pass2) { auth_erro('As senhas não coincidem.'); return; }
+  const btn = document.getElementById('btnCriar');
+  btn.disabled = true; btn.textContent = 'Salvando no GitHub...';
+  try {
+    let data = { users: {} };
+    try { data = await gh_fetchAuth(); } catch(e) {}
+    data.users = data.users || {};
+    data.users[user] = await auth_hash(pass);
+    await gh_updateAuth(data);
+    auth_sucesso(`✅ Usuário "${user}" criado! Entrando...`);
+    sessionStorage.setItem('letsbazar_sess','ok');
+    sessionStorage.setItem('letsbazar_user', user);
+    setTimeout(_abrirAdmin, 1200);
+  } catch(e) {
+    auth_erro('Erro ao salvar: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '✅ Criar acesso';
+  }
+}
+
+function auth_sair() {
+  if (!confirm('Sair do painel?')) return;
+  sessionStorage.removeItem('letsbazar_sess');
+  sessionStorage.removeItem('letsbazar_user');
+  showStore();
 }
 
 window.addEventListener('hashchange', () => {
@@ -1358,6 +1766,63 @@ function adm_carregarCfg() {
   document.getElementById('cfgEnd').value     = c.endereco;
   document.getElementById('cfgHero').value    = c.hero;
   document.getElementById('cfgHeroSub').value = c.heroSub||CFG_DEF.heroSub;
+  adm_renderUsuarios();
+}
+
+async function adm_renderUsuarios() {
+  const el = document.getElementById('cfgUsuariosLista');
+  el.innerHTML = '<p style="color:var(--cinza);font-size:0.8rem">Carregando...</p>';
+  try {
+    const data = await gh_fetchAuth();
+    const users = Object.keys(data.users||{});
+    const me = sessionStorage.getItem('letsbazar_user');
+    if (users.length === 0) {
+      el.innerHTML = '<p style="color:var(--cinza);font-size:0.82rem">Nenhum usuário cadastrado.</p>'; return;
+    }
+    el.innerHTML = users.map(u => `
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:1rem">👤</span>
+        <span style="flex:1;font-size:0.88rem;font-weight:600">${u}${u===me?' <span style="font-size:0.7rem;color:var(--verde)">(você)</span>':''}</span>
+        ${u!==me?`<button onclick="adm_excluirUsuario('${u}')"
+          style="padding:5px 10px;background:#FFE8E8;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-family:inherit;font-size:0.75rem;font-weight:700;cursor:pointer">
+          🗑️ Remover</button>`:''}
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<p style="color:var(--rosa);font-size:0.8rem">Erro ao carregar: ${e.message}</p>`;
+  }
+}
+
+async function adm_criarUsuario() {
+  const user = document.getElementById('novoUser').value.trim();
+  const pass = document.getElementById('novaSenha').value;
+  const erroEl = document.getElementById('erroUsuario');
+  erroEl.style.display = 'none';
+  if (!user) { erroEl.textContent='Informe o nome de usuário.'; erroEl.style.display='block'; return; }
+  if (pass.length < 6) { erroEl.textContent='Senha precisa ter pelo menos 6 caracteres.'; erroEl.style.display='block'; return; }
+  try {
+    const data = await gh_fetchAuth();
+    data.users = data.users || {};
+    data.users[user] = await auth_hash(pass);
+    await gh_updateAuth(data);
+    document.getElementById('novoUser').value = '';
+    document.getElementById('novaSenha').value = '';
+    adm_flash('okUsuario');
+    adm_renderUsuarios();
+  } catch(e) {
+    erroEl.textContent = 'Erro ao salvar: ' + e.message; erroEl.style.display='block';
+  }
+}
+
+async function adm_excluirUsuario(user) {
+  if (!confirm(`Remover o usuário "${user}"?`)) return;
+  try {
+    const data = await gh_fetchAuth();
+    delete data.users[user];
+    await gh_updateAuth(data);
+    adm_renderUsuarios();
+  } catch(e) {
+    alert('Erro ao remover: ' + e.message);
+  }
 }
 
 function adm_salvarInfo() {
@@ -1461,6 +1926,7 @@ atualizarCarrinho();
 
 // Rota inicial
 if (location.hash === '#admin') showAdmin();
+else showStore();
 </script>
 </body>
 </html>
