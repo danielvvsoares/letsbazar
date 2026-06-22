@@ -16,6 +16,10 @@
 
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1161,6 +1165,93 @@ const R    = v => `R$ ${Number(v).toFixed(2).replace('.',',')}`;
 const dt   = d => new Date(d).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
 const catL = c => ({roupas:'Roupas',casa:'Casa',acessorios:'Acessórios',infantil:'Infantil'}[c]||c);
 
+// ── FIREBASE ─────────────────────────────────────────────────────
+const FB_CFG = {
+  apiKey: "AIzaSyAmywibg7cIrf1612ubafWxYvtOqDfEtFU",
+  authDomain: "lets-bazar.firebaseapp.com",
+  projectId: "lets-bazar",
+  storageBucket: "lets-bazar.firebasestorage.app",
+  messagingSenderId: "553144120469",
+  appId: "1:553144120469:web:993443b5bb3702789fd79c"
+};
+
+let _db = null;
+
+function fb_init() {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
+    _db = firebase.firestore();
+  } catch(e) { console.error('Firebase init:', e); }
+}
+
+// ── Carrega todos os dados do Firestore ──────────────────────────
+async function fb_loadAll() {
+  if (!_db) return;
+  try {
+    // Config
+    const cfgDoc = await _db.collection('config').doc('loja').get();
+    if (cfgDoc.exists) save(K.cfg, cfgDoc.data());
+
+    // Produtos
+    const prodSnap = await _db.collection('produtos').get();
+    if (!prodSnap.empty) {
+      const prods = prodSnap.docs.map(d => d.data());
+      save(K.prod, prods); produtos = prods;
+    } else {
+      // Primeira vez: sobe os produtos padrão
+      const batch = _db.batch();
+      PRODUTOS_DEFAULT.forEach(p => batch.set(_db.collection('produtos').doc(String(p.id)), p));
+      await batch.commit();
+      produtos = PRODUTOS_DEFAULT;
+    }
+
+    // Pedidos
+    const pedSnap = await _db.collection('pedidos').orderBy('data','desc').get();
+    if (!pedSnap.empty) save(K.ped, pedSnap.docs.map(d => d.data()));
+  } catch(e) { console.warn('Firebase load:', e); }
+}
+
+// ── Writes ───────────────────────────────────────────────────────
+const fb_setProd  = async p  => { if(_db) await _db.collection('produtos').doc(String(p.id)).set(p); };
+const fb_delProd  = async id => { if(_db) await _db.collection('produtos').doc(String(id)).delete(); };
+const fb_setPed   = async p  => { if(_db) await _db.collection('pedidos').doc(String(p.id)).set(p); };
+const fb_updPedSt = async (id,st) => { if(_db) await _db.collection('pedidos').doc(String(id)).update({status:st}); };
+const fb_setCfg   = async c  => { if(_db) await _db.collection('config').doc('loja').set(c); };
+
+async function fb_delAllPed() {
+  if(!_db) return;
+  const snap = await _db.collection('pedidos').get();
+  const b = _db.batch(); snap.docs.forEach(d=>b.delete(d.ref)); await b.commit();
+}
+
+async function fb_seedProd(lista) {
+  if(!_db) return;
+  const snap = await _db.collection('produtos').get();
+  const b = _db.batch();
+  snap.docs.forEach(d=>b.delete(d.ref));
+  lista.forEach(p=>b.set(_db.collection('produtos').doc(String(p.id)),p));
+  await b.commit();
+}
+
+// ── Auth via Firestore (substitui GitHub auth.json) ──────────────
+async function fb_fetchAuth() {
+  if(!_db) throw new Error('Firebase não inicializado');
+  const snap = await _db.collection('usuarios').get();
+  const users = {};
+  snap.docs.forEach(d => { users[d.id] = d.data().hash; });
+  return { users };
+}
+
+async function fb_saveUser(nome, hash) {
+  if(!_db) throw new Error('Firebase não inicializado');
+  await _db.collection('usuarios').doc(nome).set({ hash, criadoEm: new Date().toISOString() });
+}
+
+async function fb_deleteUser(nome) {
+  if(!_db) throw new Error('Firebase não inicializado');
+  await _db.collection('usuarios').doc(nome).delete();
+}
+
 const getProd = () => ls(K.prod) || PRODUTOS_DEFAULT;
 const getPed  = () => ls(K.ped)  || [];
 const getCfg  = () => Object.assign({}, CFG_DEF, ls(K.cfg)||{});
@@ -1187,10 +1278,11 @@ function showAdmin() {
   _abrirAdmin();
 }
 
-function _abrirAdmin() {
+async function _abrirAdmin() {
   _showOnly('adminView');
   document.body.style.background = 'var(--bg)';
   history.replaceState(null,'','#admin');
+  await fb_loadAll(); // Recarrega tudo do Firebase
   adm_renderDash();
   adm_atualizarBadge();
 }
@@ -1199,17 +1291,13 @@ async function _mostrarLogin() {
   _showOnly('loginView');
   document.body.style.background = 'var(--escuro)';
   history.replaceState(null,'','#admin');
-  // 1) Tem token configurado?
-  const ghCfg = ls('letsbazar_gh');
-  if (!ghCfg || !ghCfg.token) { auth_mostrarForm('gh'); return; }
-  // 2) Tenta buscar auth.json do GitHub
   try {
-    const data = await gh_fetchAuth();
+    const data = await fb_fetchAuth();
     const users = data.users || {};
     auth_mostrarForm(Object.keys(users).length === 0 ? 'criar' : 'login');
   } catch(e) {
-    auth_mostrarForm('gh');
-    auth_erro('Não foi possível conectar ao GitHub. Verifique o token.');
+    auth_mostrarForm('criar');
+    auth_erro('Erro ao conectar ao Firebase: ' + e.message);
   }
 }
 
@@ -1265,17 +1353,7 @@ function auth_mostrarForm(qual) {
   const toggleBtn = document.getElementById('loginToggleBtn');
   const toggleTxt = document.getElementById('loginToggleTxt');
 
-  if (qual === 'gh') {
-    document.getElementById('formGhSetup').style.display = '';
-    document.getElementById('loginHeaderTxt').textContent = 'Configurar acesso ao GitHub';
-    if (cfg.token) {
-      document.getElementById('ghToken').value  = cfg.token;
-      document.getElementById('ghRepo').value   = cfg.owner+'/'+cfg.repo;
-      document.getElementById('ghBranch').value = cfg.branch||'main';
-    }
-    btnReconf.style.display = 'none';
-    toggleBtn.style.display = 'none'; toggleTxt.textContent = '';
-  } else if (qual === 'login') {
+  if (qual === 'login') {
     document.getElementById('formLogin').style.display = '';
     document.getElementById('loginHeaderTxt').textContent = 'Área restrita — funcionários';
     btnReconf.style.display = '';
@@ -1365,7 +1443,7 @@ async function auth_entrar() {
   const btn = document.getElementById('btnEntrar');
   btn.disabled = true; btn.textContent = 'Verificando...';
   try {
-    const data = await gh_fetchAuth();
+    const data = await fb_fetchAuth();
     const users = data.users || {};
     if (!users[user]) { auth_erro('Usuário não encontrado.'); return; }
     const hash = await auth_hash(pass);
@@ -1388,13 +1466,10 @@ async function auth_criar() {
   if (pass.length < 6){ auth_erro('Senha precisa ter pelo menos 6 caracteres.'); return; }
   if (pass !== pass2) { auth_erro('As senhas não coincidem.'); return; }
   const btn = document.getElementById('btnCriar');
-  btn.disabled = true; btn.textContent = 'Salvando no GitHub...';
+  btn.disabled = true; btn.textContent = 'Salvando no Firebase...';
   try {
-    let data = { users: {} };
-    try { data = await gh_fetchAuth(); } catch(e) {}
-    data.users = data.users || {};
-    data.users[user] = await auth_hash(pass);
-    await gh_updateAuth(data);
+    const hash = await auth_hash(pass);
+    await fb_saveUser(user, hash);
     auth_sucesso(`✅ Usuário "${user}" criado! Entrando...`);
     sessionStorage.setItem('letsbazar_sess','ok');
     sessionStorage.setItem('letsbazar_user', user);
@@ -1537,6 +1612,7 @@ function salvarPedido(canal) {
     itens: itens.map(i=>({id:i.id,nome:i.nome,emoji:i.emoji,preco:i.preco,qty:i.qty})),
     total: itens.reduce((s,i)=>s+i.preco*i.qty,0), status:'novo', canal };
   const lista = getPed(); lista.push(pedido); save(K.ped, lista);
+  fb_setPed(pedido); // async, fire-and-forget
   return pedido;
 }
 
@@ -1704,12 +1780,14 @@ function adm_salvarProduto() {
   let lista = getProd();
   lista = _editId ? lista.map(p=>p.id===_editId?novo:p) : [...lista, novo];
   save(K.prod, lista);
+  fb_setProd(novo);
   adm_fecharModal(); adm_renderProdutos(); adm_renderDash();
 }
 
 function adm_excluir(id) {
   if (!confirm('Excluir este produto?')) return;
   save(K.prod, getProd().filter(p=>p.id!==id));
+  fb_delProd(id);
   adm_renderProdutos(); adm_renderDash();
 }
 
@@ -1735,6 +1813,7 @@ function adm_renderPedidos() {
 
 function adm_mudarStatus(id, status) {
   save(K.ped, getPed().map(p=>p.id===id?{...p,status}:p));
+  fb_updPedSt(id, status);
   adm_atualizarBadge(); adm_renderDash();
 }
 
@@ -1758,9 +1837,12 @@ function adm_renderEstoque() {
   adm_limparSelecao('est');
 }
 
-function adm_salvarEst(id) {
+async function adm_salvarEst(id) {
   const val = parseInt(document.getElementById('est_'+id)?.value)||0;
-  save(K.prod, getProd().map(p=>p.id===id?{...p,estoque:val}:p));
+  const lista = getProd().map(p=>p.id===id?{...p,estoque:val}:p);
+  save(K.prod, lista);
+  const prod = lista.find(p=>p.id===id);
+  if(prod) fb_setProd(prod);
   adm_renderEstoque(); adm_renderDash();
 }
 
@@ -1778,7 +1860,7 @@ async function adm_renderUsuarios() {
   const el = document.getElementById('cfgUsuariosLista');
   el.innerHTML = '<p style="color:var(--cinza);font-size:0.8rem">Carregando...</p>';
   try {
-    const data = await gh_fetchAuth();
+    const data = await fb_fetchAuth();
     const users = Object.keys(data.users||{});
     const me = sessionStorage.getItem('letsbazar_user');
     if (users.length === 0) {
@@ -1805,10 +1887,8 @@ async function adm_criarUsuario() {
   if (!user) { erroEl.textContent='Informe o nome de usuário.'; erroEl.style.display='block'; return; }
   if (pass.length < 6) { erroEl.textContent='Senha precisa ter pelo menos 6 caracteres.'; erroEl.style.display='block'; return; }
   try {
-    const data = await gh_fetchAuth();
-    data.users = data.users || {};
-    data.users[user] = await auth_hash(pass);
-    await gh_updateAuth(data);
+    const hash = await auth_hash(pass);
+    await fb_saveUser(user, hash);
     document.getElementById('novoUser').value = '';
     document.getElementById('novaSenha').value = '';
     adm_flash('okUsuario');
@@ -1821,16 +1901,14 @@ async function adm_criarUsuario() {
 async function adm_excluirUsuario(user) {
   if (!confirm(`Remover o usuário "${user}"?`)) return;
   try {
-    const data = await gh_fetchAuth();
-    delete data.users[user];
-    await gh_updateAuth(data);
+    await fb_deleteUser(user);
     adm_renderUsuarios();
   } catch(e) {
     alert('Erro ao remover: ' + e.message);
   }
 }
 
-function adm_salvarInfo() {
+async function adm_salvarInfo() {
   const c = getCfg();
   c.nomeLoja  = document.getElementById('cfgNome').value.trim()   ||c.nomeLoja;
   c.wppNumero = document.getElementById('cfgWpp').value.trim()    ||c.wppNumero;
@@ -1838,17 +1916,23 @@ function adm_salvarInfo() {
   c.hero      = document.getElementById('cfgHero').value.trim();
   c.heroSub   = document.getElementById('cfgHeroSub').value.trim();
   save(K.cfg, c);
+  fb_setCfg(c);
   adm_flash('okInfo');
 }
 
-function adm_limparPedidos() {
+async function adm_limparPedidos() {
   if (!confirm('Apagar TODOS os pedidos?')) return;
-  save(K.ped,[]); adm_renderDash(); alert('✅ Pedidos apagados.');
+  save(K.ped,[]);
+  await fb_delAllPed();
+  adm_renderDash(); alert('✅ Pedidos apagados.');
 }
 
-function adm_resetarProdutos() {
+async function adm_resetarProdutos() {
   if (!confirm('Restaurar produtos padrão?')) return;
-  save(K.prod, PRODUTOS_DEFAULT); adm_renderProdutos(); alert('✅ Produtos restaurados.');
+  save(K.prod, PRODUTOS_DEFAULT);
+  produtos = PRODUTOS_DEFAULT;
+  await fb_seedProd(PRODUTOS_DEFAULT);
+  adm_renderProdutos(); alert('✅ Produtos restaurados.');
 }
 
 // ── SELEÇÃO EM MASSA ────────────────────────────────────────────
@@ -1887,6 +1971,7 @@ function adm_excluirSelecionados() {
   if(!ids.length) return;
   if(!confirm(`Excluir ${ids.length} produto${ids.length!==1?'s':''}? Esta ação não pode ser desfeita.`)) return;
   save(K.prod, getProd().filter(p=>!ids.includes(p.id)));
+  ids.forEach(id => fb_delProd(id));
   adm_renderProdutos(); adm_renderDash();
 }
 
@@ -1895,6 +1980,7 @@ function adm_excluirSelecionadosEst() {
   if(!ids.length) return;
   if(!confirm(`Excluir ${ids.length} produto${ids.length!==1?'s':''}? Esta ação não pode ser desfeita.`)) return;
   save(K.prod, getProd().filter(p=>!ids.includes(p.id)));
+  ids.forEach(id => fb_delProd(id));
   adm_renderEstoque(); adm_renderDash();
 }
 
@@ -1919,19 +2005,31 @@ window.addEventListener('appinstalled',()=>{ document.getElementById('installBan
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
 
 // ── INIT ─────────────────────────────────────────────────────────
-// Hero
-(function() {
+(async function init() {
+  // Inicia Firebase
+  fb_init();
+
+  // Aplica config do cache local imediatamente (evita flash)
   const cfg = getCfg();
   if (cfg.hero)    document.getElementById('heroTitulo').textContent    = cfg.hero;
   if (cfg.heroSub) document.getElementById('heroSubtitulo').textContent = cfg.heroSub;
+
+  renderProdutos();
+  atualizarCarrinho();
+
+  // Carrega dados do Firebase em background
+  await fb_loadAll();
+
+  // Aplica config atualizada do Firebase
+  const cfgFb = getCfg();
+  if (cfgFb.hero)    document.getElementById('heroTitulo').textContent    = cfgFb.hero;
+  if (cfgFb.heroSub) document.getElementById('heroSubtitulo').textContent = cfgFb.heroSub;
+  renderProdutos();
+
+  // Rota inicial
+  if (location.hash === '#admin') showAdmin();
+  else showStore();
 })();
-
-renderProdutos();
-atualizarCarrinho();
-
-// Rota inicial
-if (location.hash === '#admin') showAdmin();
-else showStore();
 </script>
 </body>
 </html>
