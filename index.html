@@ -1197,11 +1197,19 @@ async function fb_loadAll() {
       const prods = prodSnap.docs.map(d => d.data());
       save(K.prod, prods); produtos = prods;
     } else {
-      // Primeira vez: sobe os produtos padrão
-      const batch = _db.batch();
-      PRODUTOS_DEFAULT.forEach(p => batch.set(_db.collection('produtos').doc(String(p.id)), p));
-      await batch.commit();
-      produtos = PRODUTOS_DEFAULT;
+      // Verifica se é realmente a primeira vez (flag no Firestore)
+      const appDoc = await _db.collection('config').doc('app').get();
+      if (!appDoc.exists || !appDoc.data().iniciado) {
+        // Primeira vez: sobe os produtos padrão e marca como iniciado
+        const batch = _db.batch();
+        PRODUTOS_DEFAULT.forEach(p => batch.set(_db.collection('produtos').doc(String(p.id)), p));
+        batch.set(_db.collection('config').doc('app'), { iniciado: true });
+        await batch.commit();
+        produtos = PRODUTOS_DEFAULT;
+      } else {
+        // Já foi iniciado — catálogo simplesmente está vazio
+        save(K.prod, []); produtos = [];
+      }
     }
 
     // Pedidos
@@ -1353,12 +1361,12 @@ function auth_mostrarForm(qual) {
   if (qual === 'login') {
     document.getElementById('formLogin').style.display = '';
     document.getElementById('loginHeaderTxt').textContent = 'Área restrita — funcionários';
-    toggleBtn.style.display = ''; toggleBtn.textContent = '+ Criar novo usuário';
+    toggleBtn.style.display = 'none';
     toggleTxt.textContent = '';
-  } else { // criar
+  } else { // criar — só na primeira vez (sem usuários)
     document.getElementById('formCriar').style.display = '';
-    document.getElementById('loginHeaderTxt').textContent = 'Criar acesso';
-    toggleBtn.style.display = ''; toggleBtn.textContent = 'Já tenho acesso';
+    document.getElementById('loginHeaderTxt').textContent = 'Primeiro acesso — crie sua senha';
+    toggleBtn.style.display = 'none';
     toggleTxt.textContent = '';
   }
 }
