@@ -1862,12 +1862,36 @@ async function adm_renderUsuarios() {
       el.innerHTML = '<p style="color:var(--cinza);font-size:0.82rem">Nenhum usuário cadastrado.</p>'; return;
     }
     el.innerHTML = users.map(u => `
-      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
-        <span style="font-size:1rem">👤</span>
-        <span style="flex:1;font-size:0.88rem;font-weight:600">${u}${u===me?' <span style="font-size:0.7rem;color:var(--verde)">(você)</span>':''}</span>
-        ${u!==me?`<button onclick="adm_excluirUsuario('${u}')"
-          style="padding:5px 10px;background:#FFE8E8;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-family:inherit;font-size:0.75rem;font-weight:700;cursor:pointer">
-          🗑️ Remover</button>`:''}
+      <div style="border-bottom:1px solid var(--border)">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+          <span style="font-size:1rem">👤</span>
+          <span style="flex:1;font-size:0.88rem;font-weight:600">${u}${u===me?' <span style="font-size:0.7rem;color:var(--verde)">(você)</span>':''}</span>
+          <button onclick="adm_toggleSenhaForm('${u}')"
+            style="padding:5px 10px;background:#EEF2FF;color:#4361EE;border:1px solid #C7D2FE;border-radius:7px;font-family:inherit;font-size:0.75rem;font-weight:700;cursor:pointer">
+            ✏️ Senha</button>
+          ${u!==me?`<button onclick="adm_excluirUsuario('${u}')"
+            style="padding:5px 10px;background:#FFE8E8;color:#C62828;border:1px solid #FFCDD2;border-radius:7px;font-family:inherit;font-size:0.75rem;font-weight:700;cursor:pointer">
+            🗑️ Remover</button>`:''}
+        </div>
+        <div id="senhaForm_${u}" style="display:none;background:var(--bg);border-radius:10px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div style="flex:1;min-width:160px">
+              <label style="font-size:0.7rem;font-weight:700;color:var(--cinza);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Nova senha</label>
+              <input type="password" id="novaSenhaEdit_${u}" placeholder="Min. 6 caracteres"
+                style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;outline:none"/>
+            </div>
+            <div style="flex:1;min-width:160px">
+              <label style="font-size:0.7rem;font-weight:700;color:var(--cinza);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Confirmar</label>
+              <input type="password" id="novaSenhaEdit2_${u}" placeholder="Repita a senha"
+                style="width:100%;padding:8px 10px;border:2px solid var(--border);border-radius:8px;font-family:inherit;font-size:0.85rem;outline:none"/>
+            </div>
+            <button onclick="adm_alterarSenha('${u}')"
+              style="padding:9px 16px;background:linear-gradient(135deg,var(--roxo),var(--rosa));color:#fff;border:none;border-radius:8px;font-family:inherit;font-weight:700;font-size:0.82rem;cursor:pointer;white-space:nowrap">
+              💾 Salvar</button>
+          </div>
+          <div id="erroSenhaEdit_${u}" style="display:none;color:#C62828;font-size:0.78rem;margin-top:6px;font-weight:600"></div>
+          <div id="okSenhaEdit_${u}" style="display:none;color:#00695C;font-size:0.78rem;margin-top:6px;font-weight:600">✅ Senha alterada!</div>
+        </div>
       </div>`).join('');
   } catch(e) {
     el.innerHTML = `<p style="color:var(--rosa);font-size:0.8rem">Erro ao carregar: ${e.message}</p>`;
@@ -1890,6 +1914,31 @@ async function adm_criarUsuario() {
     adm_renderUsuarios();
   } catch(e) {
     erroEl.textContent = 'Erro ao salvar: ' + e.message; erroEl.style.display='block';
+  }
+}
+
+function adm_toggleSenhaForm(user) {
+  const el = document.getElementById(`senhaForm_${user}`);
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+async function adm_alterarSenha(user) {
+  const pass  = document.getElementById(`novaSenhaEdit_${user}`).value;
+  const pass2 = document.getElementById(`novaSenhaEdit2_${user}`).value;
+  const erroEl = document.getElementById(`erroSenhaEdit_${user}`);
+  const okEl   = document.getElementById(`okSenhaEdit_${user}`);
+  erroEl.style.display = 'none'; okEl.style.display = 'none';
+  if (pass.length < 6) { erroEl.textContent='Min. 6 caracteres.'; erroEl.style.display='block'; return; }
+  if (pass !== pass2)  { erroEl.textContent='Senhas não coincidem.'; erroEl.style.display='block'; return; }
+  try {
+    const hash = await auth_hash(pass);
+    await fb_saveUser(user, hash);
+    okEl.style.display = 'block';
+    document.getElementById(`novaSenhaEdit_${user}`).value = '';
+    document.getElementById(`novaSenhaEdit2_${user}`).value = '';
+    setTimeout(() => { okEl.style.display='none'; document.getElementById(`senhaForm_${user}`).style.display='none'; }, 2000);
+  } catch(e) {
+    erroEl.textContent = 'Erro: ' + e.message; erroEl.style.display='block';
   }
 }
 
