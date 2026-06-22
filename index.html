@@ -310,7 +310,7 @@
       z-index: 100; box-shadow: 0 2px 12px rgba(123,47,190,0.35);
       padding-top: env(safe-area-inset-top);
     }
-    .adm-logo { font-size: 1.1rem; font-weight: 800; color: #fff; flex: 1; }
+    .adm-logo { font-size: 1.1rem; font-weight: 800; color: #fff; flex: 1; cursor: pointer; background: none; border: none; font-family: inherit; text-align: left; padding: 0; }
     .adm-logo span { color: var(--amarelo); }
     .adm-page-title {
       font-size: 0.8rem; font-weight: 600; color: rgba(255,255,255,0.75);
@@ -323,6 +323,24 @@
       text-decoration: none; transition: background 0.18s; flex-shrink: 0;
     }
     .adm-back:hover { background: rgba(255,255,255,0.3); }
+
+    /* top nav — desktop */
+    .top-nav {
+      display: none;
+      position: fixed; top: var(--header-h); left: 0; right: 0; z-index: 99;
+      background: var(--escuro); padding: 0 24px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+    }
+    @media (min-width: 769px) { .top-nav { display: flex; } }
+    .top-nav .nav-btn {
+      flex: none; flex-direction: row; gap: 7px; padding: 0 18px;
+      height: 46px; font-size: 0.78rem;
+      color: rgba(255,255,255,0.5);
+    }
+    .top-nav .nav-ico { font-size: 1rem; }
+    .top-nav .nav-btn.ativo { color: var(--amarelo); }
+    .top-nav .nav-btn.ativo::before { top: auto; bottom: 0; left: 10%; right: 10%; height: 2px; border-radius: 2px 2px 0 0; }
+    .top-nav .nav-badge { top: 6px; right: 6px; }
 
     .adm-content {
       padding: calc(var(--header-h) + 16px) 14px calc(var(--nav-h) + 16px);
@@ -509,14 +527,15 @@
       font-family: inherit; font-size: 0.9rem; font-weight: 700; cursor: pointer;
     }
 
-    /* bottom nav */
+    /* bottom nav — só mobile */
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
       height: var(--nav-h); background: var(--escuro);
-      display: flex; z-index: 100;
+      display: none; z-index: 100;
       border-top: 1px solid rgba(255,255,255,0.07);
       padding-bottom: env(safe-area-inset-bottom);
     }
+    @media (max-width: 768px) { .bottom-nav { display: flex; } }
     .nav-btn {
       flex: 1; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 3px;
@@ -570,7 +589,17 @@
       .wpp-float svg { width: 26px; height: 26px; }
     }
 
-    @media (min-width: 600px) {
+    @media (min-width: 769px) {
+      .adm-content { padding: calc(var(--header-h) + 46px + 20px) 32px 32px; }
+      .adm-cards { grid-template-columns: repeat(4, 1fr); }
+      .dash-row { grid-template-columns: 1fr 1fr; }
+      .adm-modal { border-radius: 16px; max-width: 560px; align-self: center; }
+      .adm-modal-overlay { align-items: center; padding: 24px; }
+      .adm-modal { transform: scale(0.95); }
+      .adm-modal-overlay.aberto .adm-modal { transform: scale(1); }
+      .adm-modal-handle { display: none; }
+    }
+    @media (min-width: 600px) and (max-width: 768px) {
       .adm-content { padding: calc(var(--header-h) + 20px) 20px calc(var(--nav-h) + 20px); }
       .adm-cards { grid-template-columns: repeat(4, 1fr); }
       .dash-row { grid-template-columns: 1fr 1fr; }
@@ -668,10 +697,30 @@
 <div id="adminView" style="display:none">
 
   <header class="app-header">
-    <span class="adm-logo">✨ Let's <span>Bazar</span></span>
+    <button class="adm-logo" onclick="showStore()">✨ Let's <span>Bazar</span></button>
     <span class="adm-page-title" id="admPageTitle">Painel</span>
     <button class="adm-back" onclick="showStore()" title="Voltar à loja">🏪</button>
   </header>
+
+  <!-- nav horizontal (desktop) -->
+  <nav class="top-nav" id="topNav">
+    <button class="nav-btn ativo" onclick="adm_irPara('dashboard',this,true)" data-title="Painel">
+      <span class="nav-ico">📊</span><span>Painel</span>
+    </button>
+    <button class="nav-btn" onclick="adm_irPara('produtos',this,true)" data-title="Produtos">
+      <span class="nav-ico">📦</span><span>Produtos</span>
+    </button>
+    <button class="nav-btn" onclick="adm_irPara('pedidos',this,true)" data-title="Pedidos">
+      <span class="nav-ico">🛒</span><span>Pedidos</span>
+      <span class="nav-badge" id="badgeNovosTop" style="display:none"></span>
+    </button>
+    <button class="nav-btn" onclick="adm_irPara('estoque',this,true)" data-title="Estoque">
+      <span class="nav-ico">📋</span><span>Estoque</span>
+    </button>
+    <button class="nav-btn" onclick="adm_irPara('config',this,true)" data-title="Config">
+      <span class="nav-ico">⚙️</span><span>Config</span>
+    </button>
+  </nav>
 
   <main class="adm-content">
 
@@ -1066,11 +1115,15 @@ function adm_badgeLabel(b) {
   return {novo:'✨ Novo',oferta:'🔥 Oferta',exclusivo:'💎 Exclusivo'}[b]||b;
 }
 
-function adm_irPara(pg, btn) {
+function adm_irPara(pg, btn, isTop=false) {
   document.querySelectorAll('.adm-page').forEach(p=>p.classList.remove('ativo'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('ativo'));
   document.getElementById('adm-page-'+pg).classList.add('ativo');
-  if (btn) { btn.classList.add('ativo'); document.getElementById('admPageTitle').textContent = btn.dataset.title||''; }
+  // Sincroniza bottom nav e top nav
+  const title = btn?.dataset.title||pg;
+  document.getElementById('admPageTitle').textContent = title;
+  // Marca ativo em ambas as navs pelo data-title
+  document.querySelectorAll('.nav-btn').forEach(b=>{ if(b.dataset.title===title) b.classList.add('ativo'); });
   ({dashboard:adm_renderDash, produtos:adm_renderProdutos, pedidos:adm_renderPedidos, estoque:adm_renderEstoque, config:adm_carregarCfg}[pg]||(() => {}))();
   window.scrollTo(0,0);
 }
@@ -1118,8 +1171,10 @@ function adm_renderDash() {
 
 function adm_atualizarBadge() {
   const n = getPed().filter(p=>p.status==='novo').length;
-  const el = document.getElementById('badgeNovos');
-  el.textContent = n; el.style.display = n ? 'flex' : 'none';
+  ['badgeNovos','badgeNovosTop'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) { el.textContent = n; el.style.display = n ? 'flex' : 'none'; }
+  });
 }
 
 function adm_renderProdutos() {
