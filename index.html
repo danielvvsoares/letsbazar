@@ -887,7 +887,6 @@
       <button class="login-toggle" id="loginToggleBtn" onclick="auth_alternarForm()" style="display:none"></button>
       <br>
       <button class="login-back" onclick="showStore()">← Voltar à loja</button>
-      <button class="login-back" id="btnReconfGh" onclick="auth_mostrarForm('gh')" style="display:none">⚙️ Reconfigurar GitHub</button>
     </div>
   </div>
 </div>
@@ -1348,21 +1347,17 @@ function auth_mostrarForm(qual) {
   document.getElementById('loginErro').style.display = 'none';
   document.getElementById('loginOk').style.display   = 'none';
 
-  const cfg = getGhCfg();
-  const btnReconf = document.getElementById('btnReconfGh');
   const toggleBtn = document.getElementById('loginToggleBtn');
   const toggleTxt = document.getElementById('loginToggleTxt');
 
   if (qual === 'login') {
     document.getElementById('formLogin').style.display = '';
     document.getElementById('loginHeaderTxt').textContent = 'Área restrita — funcionários';
-    btnReconf.style.display = '';
     toggleBtn.style.display = ''; toggleBtn.textContent = '+ Criar novo usuário';
     toggleTxt.textContent = '';
   } else { // criar
     document.getElementById('formCriar').style.display = '';
     document.getElementById('loginHeaderTxt').textContent = 'Criar acesso';
-    btnReconf.style.display = '';
     toggleBtn.style.display = ''; toggleBtn.textContent = 'Já tenho acesso';
     toggleTxt.textContent = '';
   }
