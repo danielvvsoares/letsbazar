@@ -19,7 +19,6 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1188,27 +1187,31 @@ const FB_CFG = {
 };
 
 let _db = null;
-let _storage = null;
 
 function fb_init() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
     _db = firebase.firestore();
-    _storage = firebase.storage();
   } catch(e) { console.error('Firebase init:', e); }
 }
 
-async function fb_uploadImagem(file, prodId) {
-  if (!_storage) throw new Error('Storage não inicializado');
-  const ext = file.name.split('.').pop();
-  const ref = _storage.ref(`produtos/${prodId}.${ext}`);
-  await ref.put(file);
-  return await ref.getDownloadURL();
-}
-
-async function fb_deleteImagem(url) {
-  if (!_storage || !url) return;
-  try { await _storage.refFromURL(url).delete(); } catch(e) {}
+// Comprime e converte imagem para base64 (max 600px, JPEG 75%)
+function adm_comprimirImagem(file, maxW = 600, q = 0.75) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', q));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Erro ao ler imagem')); };
+    img.src = url;
+  });
 }
 
 // ── Carrega todos os dados do Firestore ──────────────────────────
@@ -1832,29 +1835,24 @@ async function adm_salvarProduto() {
   btnSalvar.textContent = '⏳ Salvando...';
 
   try {
-    const prodId = _editId || Date.now();
     const fileInput = document.getElementById('fImagem');
     const remover = document.getElementById('fRemoverImagem').value === '1';
     let imagemUrl = document.getElementById('fImagemUrl').value || null;
 
-    // Upload nova imagem se selecionada
     if (fileInput.files && fileInput.files[0]) {
-      // Apaga imagem antiga se existia
-      if (imagemUrl) await fb_deleteImagem(imagemUrl);
-      imagemUrl = await fb_uploadImagem(fileInput.files[0], prodId);
-    } else if (remover && imagemUrl) {
-      await fb_deleteImagem(imagemUrl);
+      imagemUrl = await adm_comprimirImagem(fileInput.files[0]);
+    } else if (remover) {
       imagemUrl = null;
     }
 
     const novo = {
-      id: prodId, nome,
-      emoji:    document.getElementById('fEmoji').value.trim()||'📦',
+      id: _editId || Date.now(), nome,
+      emoji:    document.getElementById('fEmoji').value.trim() || '📦',
       cat:      document.getElementById('fCat').value,
-      badge:    document.getElementById('fBadge').value||null,
-      preco:    parseFloat(document.getElementById('fPreco').value)||0,
-      precoOld: parseFloat(document.getElementById('fPrecoOld').value)||null,
-      estoque:  parseInt(document.getElementById('fEst').value)||0,
+      badge:    document.getElementById('fBadge').value || null,
+      preco:    parseFloat(document.getElementById('fPreco').value) || 0,
+      precoOld: parseFloat(document.getElementById('fPrecoOld').value) || null,
+      estoque:  parseInt(document.getElementById('fEst').value) || 0,
       tags:     document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean),
       descricao:document.getElementById('fDesc').value.trim(),
       imagemUrl: imagemUrl || null,
@@ -1866,7 +1864,7 @@ async function adm_salvarProduto() {
     adm_fecharModal(); adm_renderProdutos(); adm_renderDash();
   } catch(e) {
     console.error('Erro ao salvar:', e);
-    alert('Erro ao fazer upload da imagem. Tente novamente.');
+    alert('Erro ao processar imagem. Tente novamente.');
   } finally {
     btnSalvar.disabled = false;
     btnSalvar.textContent = '💾 Salvar';
