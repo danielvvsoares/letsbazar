@@ -19,6 +19,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1119,6 +1120,18 @@
         <div class="adm-field"><label>Tags (vírgula)</label><input type="text" id="fTags" placeholder="Ex: vestido, floral"/></div>
       </div>
       <div class="adm-field"><label>Descrição curta</label><textarea id="fDesc" rows="2" placeholder="Opcional..."></textarea></div>
+      <div class="adm-field">
+        <label>Imagem do produto</label>
+        <div id="fImgPreviewWrap" style="display:none;margin-bottom:8px;position:relative;width:100%;max-width:200px">
+          <img id="fImgPreview" src="" alt="Preview" style="width:100%;border-radius:10px;object-fit:cover;max-height:160px;border:2px solid var(--border)"/>
+          <button type="button" onclick="adm_removerImgPreview()" title="Remover imagem" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.85rem;line-height:1;display:flex;align-items:center;justify-content:center">✕</button>
+        </div>
+        <input type="file" id="fImagem" accept="image/*" style="display:none" onchange="adm_previewImagem(this)"/>
+        <input type="hidden" id="fImagemUrl" value=""/>
+        <input type="hidden" id="fRemoverImagem" value="0"/>
+        <button type="button" onclick="document.getElementById('fImagem').click()" style="background:var(--bg);border:2px dashed var(--border);border-radius:10px;padding:10px 18px;cursor:pointer;font-family:inherit;font-size:0.85rem;color:var(--cinza);width:100%;text-align:center">📷 Escolher imagem</button>
+        <p style="font-size:0.75rem;color:var(--cinza);margin-top:4px">Ou use o campo "Emoji ou URL" acima para um emoji ou link de imagem.</p>
+      </div>
     </div>
     <div class="adm-modal-footer">
       <button class="adm-btn-cancel" onclick="adm_fecharModal()">Cancelar</button>
@@ -1175,12 +1188,27 @@ const FB_CFG = {
 };
 
 let _db = null;
+let _storage = null;
 
 function fb_init() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
     _db = firebase.firestore();
+    _storage = firebase.storage();
   } catch(e) { console.error('Firebase init:', e); }
+}
+
+async function fb_uploadImagem(file, prodId) {
+  if (!_storage) throw new Error('Storage não inicializado');
+  const ext = file.name.split('.').pop();
+  const ref = _storage.ref(`produtos/${prodId}.${ext}`);
+  await ref.put(file);
+  return await ref.getDownloadURL();
+}
+
+async function fb_deleteImagem(url) {
+  if (!_storage || !url) return;
+  try { await _storage.refFromURL(url).delete(); } catch(e) {}
 }
 
 // ── Carrega todos os dados do Firestore ──────────────────────────
@@ -1530,7 +1558,7 @@ function renderProdutos() {
       ? `<span class="produto-preco-old">R$ ${p.precoOld.toFixed(2).replace('.',',')}</span>` : '';
     return `
       <div class="produto-card" style="animation-delay:${i*0.04}s">
-        <div class="produto-img">${badgeHTML}${p.emoji}</div>
+        <div class="produto-img">${badgeHTML}${p.imagemUrl ? `<img src="${p.imagemUrl}" alt="${p.nome}" style="width:100%;height:100%;object-fit:cover;border-radius:0;display:block"/>` : p.emoji}</div>
         <div class="produto-info">
           <span class="produto-categoria">${catL(p.cat)}</span>
           <span class="produto-nome">${p.nome}</span>
@@ -1722,7 +1750,7 @@ function adm_renderProdutos() {
     : lista.map(p=>`
       <tr>
         <td><input type="checkbox" class="adm-chk chk-prod" data-id="${p.id}" onchange="adm_atualizarBulk('prod')"/></td>
-        <td style="font-size:1.3rem">${p.emoji}</td>
+        <td style="font-size:1.3rem">${p.imagemUrl ? `<img src="${p.imagemUrl}" alt="" style="width:36px;height:36px;object-fit:cover;border-radius:8px;vertical-align:middle"/>` : p.emoji}</td>
         <td><strong>${p.nome}</strong></td>
         <td><span class="adm-badge badge-cat">${catL(p.cat)}</span></td>
         <td>${R(p.preco)}</td>
@@ -1742,10 +1770,16 @@ let _editId = null;
 function adm_abrirModal(id=null) {
   _editId = id;
   document.getElementById('admModalTit').textContent = id ? 'Editar Produto' : 'Novo Produto';
+  // Reset campos de imagem
+  document.getElementById('fImagem').value = '';
+  document.getElementById('fImagemUrl').value = '';
+  document.getElementById('fRemoverImagem').value = '0';
+  document.getElementById('fImgPreviewWrap').style.display = 'none';
+  document.getElementById('fImgPreview').src = '';
   if (id) {
     const p = getProd().find(x=>x.id===id); if (!p) return;
     document.getElementById('fNome').value    = p.nome;
-    document.getElementById('fEmoji').value   = p.emoji;
+    document.getElementById('fEmoji').value   = p.emoji||'';
     document.getElementById('fCat').value     = p.cat;
     document.getElementById('fBadge').value   = p.badge||'';
     document.getElementById('fPreco').value   = p.preco;
@@ -1753,6 +1787,11 @@ function adm_abrirModal(id=null) {
     document.getElementById('fEst').value     = p.estoque||0;
     document.getElementById('fTags').value    = (p.tags||[]).join(', ');
     document.getElementById('fDesc').value    = p.descricao||'';
+    if (p.imagemUrl) {
+      document.getElementById('fImagemUrl').value = p.imagemUrl;
+      document.getElementById('fImgPreview').src = p.imagemUrl;
+      document.getElementById('fImgPreviewWrap').style.display = 'block';
+    }
   } else {
     ['fNome','fEmoji','fPreco','fPrecoOld','fTags','fDesc'].forEach(i=>document.getElementById(i).value='');
     document.getElementById('fEst').value=0; document.getElementById('fCat').value='roupas'; document.getElementById('fBadge').value='';
@@ -1766,25 +1805,72 @@ function adm_fecharModal() {
   document.body.style.overflow = '';
 }
 
-function adm_salvarProduto() {
+function adm_previewImagem(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('fImgPreview').src = e.target.result;
+    document.getElementById('fImgPreviewWrap').style.display = 'block';
+    document.getElementById('fRemoverImagem').value = '0';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function adm_removerImgPreview() {
+  document.getElementById('fImagem').value = '';
+  document.getElementById('fImgPreview').src = '';
+  document.getElementById('fImgPreviewWrap').style.display = 'none';
+  document.getElementById('fRemoverImagem').value = '1';
+}
+
+async function adm_salvarProduto() {
   const nome = document.getElementById('fNome').value.trim();
   if (!nome) { alert('Informe o nome do produto.'); return; }
-  const novo = {
-    id: _editId||Date.now(), nome,
-    emoji:    document.getElementById('fEmoji').value.trim()||'📦',
-    cat:      document.getElementById('fCat').value,
-    badge:    document.getElementById('fBadge').value||null,
-    preco:    parseFloat(document.getElementById('fPreco').value)||0,
-    precoOld: parseFloat(document.getElementById('fPrecoOld').value)||null,
-    estoque:  parseInt(document.getElementById('fEst').value)||0,
-    tags:     document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean),
-    descricao:document.getElementById('fDesc').value.trim(),
-  };
-  let lista = getProd();
-  lista = _editId ? lista.map(p=>p.id===_editId?novo:p) : [...lista, novo];
-  save(K.prod, lista);
-  fb_setProd(novo);
-  adm_fecharModal(); adm_renderProdutos(); adm_renderDash();
+
+  const btnSalvar = document.querySelector('.adm-btn-save');
+  btnSalvar.disabled = true;
+  btnSalvar.textContent = '⏳ Salvando...';
+
+  try {
+    const prodId = _editId || Date.now();
+    const fileInput = document.getElementById('fImagem');
+    const remover = document.getElementById('fRemoverImagem').value === '1';
+    let imagemUrl = document.getElementById('fImagemUrl').value || null;
+
+    // Upload nova imagem se selecionada
+    if (fileInput.files && fileInput.files[0]) {
+      // Apaga imagem antiga se existia
+      if (imagemUrl) await fb_deleteImagem(imagemUrl);
+      imagemUrl = await fb_uploadImagem(fileInput.files[0], prodId);
+    } else if (remover && imagemUrl) {
+      await fb_deleteImagem(imagemUrl);
+      imagemUrl = null;
+    }
+
+    const novo = {
+      id: prodId, nome,
+      emoji:    document.getElementById('fEmoji').value.trim()||'📦',
+      cat:      document.getElementById('fCat').value,
+      badge:    document.getElementById('fBadge').value||null,
+      preco:    parseFloat(document.getElementById('fPreco').value)||0,
+      precoOld: parseFloat(document.getElementById('fPrecoOld').value)||null,
+      estoque:  parseInt(document.getElementById('fEst').value)||0,
+      tags:     document.getElementById('fTags').value.split(',').map(t=>t.trim()).filter(Boolean),
+      descricao:document.getElementById('fDesc').value.trim(),
+      imagemUrl: imagemUrl || null,
+    };
+    let lista = getProd();
+    lista = _editId ? lista.map(p=>p.id===_editId?novo:p) : [...lista, novo];
+    save(K.prod, lista);
+    fb_setProd(novo);
+    adm_fecharModal(); adm_renderProdutos(); adm_renderDash();
+  } catch(e) {
+    console.error('Erro ao salvar:', e);
+    alert('Erro ao fazer upload da imagem. Tente novamente.');
+  } finally {
+    btnSalvar.disabled = false;
+    btnSalvar.textContent = '💾 Salvar';
+  }
 }
 
 function adm_excluir(id) {
@@ -1826,7 +1912,7 @@ function adm_renderEstoque() {
     .map(p=>`
       <tr>
         <td><input type="checkbox" class="adm-chk chk-est" data-id="${p.id}" onchange="adm_atualizarBulk('est')"/></td>
-        <td style="font-size:1.2rem">${p.emoji}</td>
+        <td style="font-size:1.2rem">${p.imagemUrl ? `<img src="${p.imagemUrl}" alt="" style="width:32px;height:32px;object-fit:cover;border-radius:7px;vertical-align:middle"/>` : p.emoji}</td>
         <td><strong>${p.nome}</strong></td>
         <td><span class="adm-badge badge-cat">${catL(p.cat)}</span></td>
         <td class="${(p.estoque||0)<=5?'adm-estoque-baixo':''}">${p.estoque||0} un.</td>
