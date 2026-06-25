@@ -258,21 +258,23 @@
     .perfil-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.55); z-index: 2000;
-      align-items: flex-end; justify-content: center;
+      align-items: flex-start; justify-content: center;
+      overflow-y: auto;
+      padding: max(16px, env(safe-area-inset-top, 16px)) 0 16px;
     }
     .perfil-overlay.aberto { display: flex; }
     .perfil-sheet {
-      background: #fff; border-radius: 24px 24px 0 0;
-      width: 100%; max-width: 600px;
-      max-height: 90vh; overflow-y: auto;
-      animation: slideUp 0.3s ease;
-      padding-bottom: env(safe-area-inset-bottom, 20px);
+      background: #fff; border-radius: 20px;
+      width: 100%; max-width: 500px; margin: auto 16px;
+      max-height: calc(100vh - 40px); overflow-y: auto;
+      animation: fadeUp 0.25s ease;
     }
     @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .perfil-header {
       background: linear-gradient(135deg, var(--roxo), var(--rosa));
       padding: 24px; color: #fff; display: flex; align-items: center; gap: 16px;
-      border-radius: 24px 24px 0 0;
+      border-radius: 20px 20px 0 0;
+      position: sticky; top: 0; z-index: 10;
     }
     .perfil-avatar {
       width: 56px; height: 56px; border-radius: 50%;
@@ -285,7 +287,12 @@
     .perfil-nome { font-size: 1.1rem; font-weight: 700; }
     .perfil-email { font-size: 0.8rem; opacity: 0.85; }
     .perfil-close { margin-left: auto; background: rgba(255,255,255,0.2); border: none; color: #fff; font-size: 1.1rem; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-    .perfil-body { padding: 20px; }
+    .perfil-tabs { display: flex; border-bottom: 2px solid var(--border); background: #fff; position: sticky; top: 88px; z-index: 9; }
+    .perfil-tab { flex: 1; padding: 12px 6px; background: none; border: none; font-family: inherit; font-size: 0.82rem; font-weight: 600; color: var(--cinza); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: color 0.2s; }
+    .perfil-tab.ativo { color: var(--roxo); border-bottom-color: var(--roxo); }
+    .perfil-secao { display: none; padding: 20px; }
+    .perfil-secao.ativo { display: block; }
+    .perfil-body { padding: 0; }
     .perfil-section { margin-bottom: 24px; }
     .perfil-section h4 { font-size: 0.8rem; font-weight: 700; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
     .perfil-field { margin-bottom: 12px; }
@@ -2208,14 +2215,21 @@ document.addEventListener('click', e => {
   if (!e.target.closest('.cli-dropdown-wrap')) cli_fecharDropdown();
 });
 
+function perfil_aba(aba) {
+  const mapa = { dados: ['ptabDados','psecDados'], endereco: ['ptabEnd','psecEnd'], pedidos: ['ptabPedidos','psecPedidos'] };
+  document.querySelectorAll('.perfil-tab').forEach(t => t.classList.remove('ativo'));
+  document.querySelectorAll('.perfil-secao').forEach(s => s.classList.remove('ativo'));
+  const [tabId, secId] = mapa[aba];
+  document.getElementById(tabId).classList.add('ativo');
+  document.getElementById(secId).classList.add('ativo');
+  // Volta pro topo do sheet
+  document.querySelector('.perfil-sheet')?.scrollTo({ top: 0 });
+}
+
 async function cli_abrirSecao(secao) {
   cli_fecharDropdown();
   await cli_abrirPerfil();
-  // Rola até a seção certa após abrir
-  setTimeout(() => {
-    const alvos = { dados: 'perfilCampoNome', endereco: 'perfilCampoCep', pedidos: 'perfilPedidos' };
-    document.getElementById(alvos[secao])?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 300);
+  perfil_aba(secao);
 }
 
 function cli_abrirModal() {
@@ -2946,14 +2960,22 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
       </div>
       <button class="perfil-close" onclick="cli_fecharPerfil()">✕</button>
     </div>
+    <div class="perfil-tabs">
+      <button class="perfil-tab ativo" id="ptabDados"   onclick="perfil_aba('dados')">👤 Dados</button>
+      <button class="perfil-tab"       id="ptabEnd"     onclick="perfil_aba('endereco')">📍 Endereço</button>
+      <button class="perfil-tab"       id="ptabPedidos" onclick="perfil_aba('pedidos')">🛍️ Compras</button>
+    </div>
     <div class="perfil-body">
-      <div class="perfil-section">
-        <h4>Dados pessoais</h4>
+      <!-- ABA DADOS -->
+      <div class="perfil-secao ativo" id="psecDados">
         <div class="perfil-field"><label>Nome completo</label><input type="text" id="perfilCampoNome" placeholder="Seu nome"/></div>
         <div class="perfil-field"><label>Telefone</label><input type="tel" id="perfilCampoTel" placeholder="(27) 99999-9999"/></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <button class="perfil-btn-save" onclick="cli_salvarPerfil()">💾 Salvar</button>
+        </div>
       </div>
-      <div class="perfil-section">
-        <h4>Endereço</h4>
+      <!-- ABA ENDEREÇO -->
+      <div class="perfil-secao" id="psecEnd">
         <div class="perfil-field"><label>CEP</label><input type="text" id="perfilCampoCep" placeholder="00000-000" oninput="cli_buscarCep(this.value)"/></div>
         <div class="perfil-field"><label>Rua</label><input type="text" id="perfilCampoRua" placeholder="Rua, Av..."/></div>
         <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">
@@ -2965,14 +2987,13 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
           <div class="perfil-field"><label>Estado</label><input type="text" id="perfilCampoEstado" placeholder="ES" maxlength="2"/></div>
         </div>
         <div class="perfil-field"><label>Complemento</label><input type="text" id="perfilCampoComp" placeholder="Apto, bloco..."/></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+          <button class="perfil-btn-save" onclick="cli_salvarPerfil()">💾 Salvar</button>
+        </div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px">
-        <button class="perfil-btn-save" onclick="cli_salvarPerfil()">💾 Salvar dados</button>
-        <button class="perfil-btn-logout" onclick="cli_logout()">Sair da conta</button>
-      </div>
-      <div class="perfil-section">
-        <h4>Meus pedidos</h4>
-        <div id="perfilPedidos"><p style="color:var(--cinza);font-size:0.85rem">Nenhum pedido ainda.</p></div>
+      <!-- ABA PEDIDOS -->
+      <div class="perfil-secao" id="psecPedidos">
+        <div id="perfilPedidos"><p style="color:var(--cinza);font-size:0.85rem">Carregando...</p></div>
       </div>
     </div>
   </div>
