@@ -186,8 +186,9 @@
     .cli-modal-overlay {
       display: none; position: fixed; inset: 0;
       background: rgba(0,0,0,0.55); z-index: 2000;
-      align-items: center; justify-content: center;
-      padding: 16px;
+      align-items: flex-start; justify-content: center;
+      padding: max(16px, env(safe-area-inset-top, 16px)) 16px 16px;
+      overflow-y: auto;
     }
     .cli-modal-overlay.aberto { display: flex; }
     .cli-modal {
@@ -195,7 +196,7 @@
       width: 100%; max-width: 420px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.25);
       overflow: hidden; animation: fadeUp 0.25s ease;
-      max-height: 90vh; overflow-y: auto;
+      margin: auto 0;
     }
     .cli-modal-header {
       background: linear-gradient(135deg, var(--roxo), var(--rosa));
@@ -295,6 +296,30 @@
     .perfil-btn-logout { padding: 11px 24px; border: 2px solid var(--border); border-radius: 10px; background: #fff; font-family: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; color: var(--cinza); }
     .perfil-pedido-card { background: var(--bg); border-radius: 12px; padding: 14px; margin-bottom: 10px; font-size: 0.85rem; }
     .perfil-pedido-card strong { font-size: 0.92rem; }
+
+    /* Dropdown do cliente */
+    .cli-dropdown-wrap { position: relative; }
+    .cli-dropdown {
+      display: none; position: absolute; top: calc(100% + 8px); right: 0;
+      background: #fff; border-radius: 14px; min-width: 190px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18); z-index: 500;
+      overflow: hidden; animation: fadeUp 0.15s ease;
+    }
+    .cli-dropdown.aberto { display: block; }
+    .cli-dropdown-user {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      font-size: 0.82rem; color: var(--cinza); line-height: 1.4;
+    }
+    .cli-dropdown-user strong { display: block; color: var(--escuro); font-size: 0.9rem; }
+    .cli-dropdown-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; width: 100%; background: none; border: none;
+      font-family: inherit; font-size: 0.88rem; font-weight: 500;
+      color: var(--escuro); cursor: pointer; text-align: left;
+      transition: background 0.15s;
+    }
+    .cli-dropdown-item:hover { background: var(--bg); }
+    .cli-dropdown-item.sair { color: #C62828; border-top: 1px solid var(--border); }
 
     /* Botão Entrar no header */
     .entrar-btn {
@@ -944,9 +969,21 @@
         <input id="inputBusca" type="text" placeholder="Buscar roupas, acessórios..." oninput="filtrar()"/>
         <button>🔍</button>
       </div>
-      <button class="entrar-btn" id="btnEntrar" onclick="cli_abrirModal()">
-        👤 <span id="btnEntrarTxt">Entrar</span>
-      </button>
+      <div class="cli-dropdown-wrap">
+        <button class="entrar-btn" id="btnEntrar" onclick="cli_toggleDropdown()">
+          👤 <span id="btnEntrarTxt">Entrar</span>
+        </button>
+        <div class="cli-dropdown" id="cliDropdown">
+          <div class="cli-dropdown-user">
+            <strong id="ddNome"></strong>
+            <span id="ddEmail"></span>
+          </div>
+          <button class="cli-dropdown-item" onclick="cli_abrirSecao('dados')">👤 Dados da conta</button>
+          <button class="cli-dropdown-item" onclick="cli_abrirSecao('endereco')">📍 Endereços</button>
+          <button class="cli-dropdown-item" onclick="cli_abrirSecao('pedidos')">🛍️ Minhas compras</button>
+          <button class="cli-dropdown-item sair" onclick="cli_logout()">🚪 Sair da conta</button>
+        </div>
+      </div>
       <button class="cart-btn" onclick="abrirCarrinho()">
         🛒 <span class="cart-txt">Carrinho</span> <span class="cart-count" id="cartCount">0</span>
       </button>
@@ -1500,22 +1537,25 @@ async function fb_updateBannerOrdem(docId, ordem) {
   await _db.collection('banners').doc(docId).update({ ordem });
 }
 
-// Comprime e converte imagem para base64 (max 600px, JPEG 75%)
+// Comprime e converte imagem para base64 (usa FileReader — mais compatível)
 function adm_comprimirImagem(file, maxW = 600, q = 0.75) {
   return new Promise((resolve, reject) => {
-    const img = new Image();
-    const url = URL.createObjectURL(file);
-    img.onload = () => {
-      let w = img.width, h = img.height;
-      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
-      const canvas = document.createElement('canvas');
-      canvas.width = w; canvas.height = h;
-      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', q));
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Erro ao ler arquivo'));
+    reader.onload = e => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Imagem inválida'));
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', q));
+      };
+      img.src = e.target.result;
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Erro ao ler imagem')); };
-    img.src = url;
+    reader.readAsDataURL(file);
   });
 }
 
@@ -2138,16 +2178,44 @@ function adm_renderProdutos() {
 // ════════════════════════════════════════════════
 
 function cli_atualizarHeaderBtn() {
-  const btn = document.getElementById('btnEntrarTxt');
-  if (!btn) return;
+  const txt = document.getElementById('btnEntrarTxt');
+  if (!txt) return;
   if (_cliUser) {
     const nome = _cliUser.displayName || _cliUser.email.split('@')[0];
-    btn.textContent = nome.split(' ')[0];
-    document.getElementById('btnEntrar').onclick = cli_abrirPerfil;
+    txt.textContent = nome.split(' ')[0];
+    document.getElementById('ddNome').textContent  = _cliUser.displayName || nome;
+    document.getElementById('ddEmail').textContent = _cliUser.email;
+    // clique abre dropdown, não mais o modal
+    document.getElementById('btnEntrar').onclick = cli_toggleDropdown;
   } else {
-    btn.textContent = 'Entrar';
+    txt.textContent = 'Entrar';
     document.getElementById('btnEntrar').onclick = cli_abrirModal;
+    cli_fecharDropdown();
   }
+}
+
+function cli_toggleDropdown() {
+  if (!_cliUser) return cli_abrirModal();
+  document.getElementById('cliDropdown').classList.toggle('aberto');
+}
+
+function cli_fecharDropdown() {
+  document.getElementById('cliDropdown')?.classList.remove('aberto');
+}
+
+// Fecha dropdown ao clicar fora
+document.addEventListener('click', e => {
+  if (!e.target.closest('.cli-dropdown-wrap')) cli_fecharDropdown();
+});
+
+async function cli_abrirSecao(secao) {
+  cli_fecharDropdown();
+  await cli_abrirPerfil();
+  // Rola até a seção certa após abrir
+  setTimeout(() => {
+    const alvos = { dados: 'perfilCampoNome', endereco: 'perfilCampoCep', pedidos: 'perfilPedidos' };
+    document.getElementById(alvos[secao])?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 300);
 }
 
 function cli_abrirModal() {
