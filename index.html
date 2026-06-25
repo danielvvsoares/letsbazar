@@ -774,10 +774,29 @@
     /* ════════════════════════════════════════════════
        RESPONSIVO
     ════════════════════════════════════════════════ */
+    /* Busca mobile */
+    .search-bar-mobile {
+      display: none;
+      padding: 10px 16px;
+      background: linear-gradient(135deg, var(--roxo), var(--rosa));
+    }
+    .search-bar-mobile input {
+      width: 100%; padding: 10px 16px;
+      border: none; border-radius: 50px;
+      font-family: inherit; font-size: 0.9rem;
+      background: rgba(255,255,255,0.22); color: #fff;
+      outline: none;
+    }
+    .search-bar-mobile input::placeholder { color: rgba(255,255,255,0.75); }
+
     @media (max-width: 600px) {
       .search-bar { display: none; }
-      .entrar-btn span { display: none; } /* mostra só ícone em mobile */
-      .entrar-btn { padding: 8px 10px; }
+      .search-bar-mobile { display: block; }
+      .header-inner { gap: 8px; }
+      .logo { font-size: 1.15rem; }
+      .cart-txt { display: none; }
+      .cart-btn { padding: 9px 12px; gap: 4px; }
+      .entrar-btn { padding: 8px 10px; font-size: 0.8rem; gap: 4px; }
       .hero { padding: 36px 16px; }
       .hero h1 { font-size: 1.6rem; }
       .hero p  { font-size: 0.9rem; }
@@ -929,7 +948,7 @@
         👤 <span id="btnEntrarTxt">Entrar</span>
       </button>
       <button class="cart-btn" onclick="abrirCarrinho()">
-        🛒 Carrinho <span class="cart-count" id="cartCount">0</span>
+        🛒 <span class="cart-txt">Carrinho</span> <span class="cart-count" id="cartCount">0</span>
       </button>
     </div>
   </header>
@@ -946,6 +965,11 @@
     <button class="banner-arrow prev" onclick="banner_nav(-1)">&#8249;</button>
     <button class="banner-arrow next" onclick="banner_nav(1)">&#8250;</button>
     <div class="banner-dots" id="bannerDots"></div>
+  </div>
+
+  <!-- Barra de busca mobile (aparece só em telas pequenas) -->
+  <div class="search-bar-mobile">
+    <input type="text" placeholder="🔍 Buscar roupas, acessórios..." oninput="filtrar()" id="inputBuscaMobile"/>
   </div>
 
   <div class="filtros-wrap">
@@ -1450,15 +1474,30 @@ async function fb_cliGetPedidos(uid) {
   return snap.docs.map(d=>d.data()).sort((a,b)=>new Date(b.data)-new Date(a.data));
 }
 
-// ── Firebase Banners ─────────────────────────────────────────────
+// ── Firebase Banners (cada banner = documento próprio) ───────────
 async function fb_getBanners() {
   if (!_db) return [];
-  const doc = await _db.collection('config').doc('banners').get();
-  return doc.exists ? (doc.data().lista || []) : [];
+  try {
+    const snap = await _db.collection('banners').orderBy('ordem').get();
+    return snap.docs.map(d => ({ _docId: d.id, ...d.data() }));
+  } catch(e) {
+    // fallback se índice não existir ainda
+    const snap = await _db.collection('banners').get();
+    return snap.docs.map(d => ({ _docId: d.id, ...d.data() })).sort((a,b)=>(a.ordem||0)-(b.ordem||0));
+  }
 }
-async function fb_setBanners(lista) {
+async function fb_addBanner(banner) {
   if (!_db) return;
-  await _db.collection('config').doc('banners').set({ lista });
+  const ref = await _db.collection('banners').add(banner);
+  return ref.id;
+}
+async function fb_deleteBanner(docId) {
+  if (!_db || !docId) return;
+  await _db.collection('banners').doc(docId).delete();
+}
+async function fb_updateBannerOrdem(docId, ordem) {
+  if (!_db || !docId) return;
+  await _db.collection('banners').doc(docId).update({ ordem });
 }
 
 // Comprime e converte imagem para base64 (max 600px, JPEG 75%)
@@ -1904,7 +1943,12 @@ function setFiltro(cat, btn) {
 }
 
 function filtrar() {
-  buscaAtual = document.getElementById('inputBusca').value;
+  // Sincroniza os dois inputs (header desktop e mobile)
+  const desktop = document.getElementById('inputBusca');
+  const mobile  = document.getElementById('inputBuscaMobile');
+  buscaAtual = (desktop?.value || mobile?.value || '');
+  if (desktop && document.activeElement === mobile) desktop.value = buscaAtual;
+  if (mobile  && document.activeElement === desktop) mobile.value  = buscaAtual;
   renderProdutos();
 }
 
@@ -2322,24 +2366,36 @@ function banner_removerPreview() {
 async function banner_adicionar() {
   const file = document.getElementById('bnImagem').files[0];
   if (!file) return alert('Selecione uma imagem.');
-  const titulo = document.getElementById('bnTitulo').value.trim();
-  const sub    = document.getElementById('bnSub').value.trim();
-  const imagem = await adm_comprimirImagem(file, 1200, 0.80);
-  _bannerLista.push({ imagem, titulo, sub });
-  await fb_setBanners(_bannerLista);
-  banner_renderAdmin();
-  banner_render(_bannerLista); // atualiza na loja
-  banner_removerPreview();
-  document.getElementById('bnTitulo').value = '';
-  document.getElementById('bnSub').value = '';
-  const ok = document.getElementById('okBanner');
-  ok.style.display='block'; setTimeout(()=>ok.style.display='none',2500);
+  const btnAdd = document.querySelector('[onclick="banner_adicionar()"]');
+  btnAdd.disabled = true; btnAdd.textContent = '⏳ Salvando...';
+  try {
+    const titulo = document.getElementById('bnTitulo').value.trim();
+    const sub    = document.getElementById('bnSub').value.trim();
+    // Comprime mais agressivamente: 800px, 60% — fica bem abaixo do limite do Firestore
+    const imagem = await adm_comprimirImagem(file, 800, 0.60);
+    const ordem  = _bannerLista.length;
+    const docId  = await fb_addBanner({ imagem, titulo, sub, ordem });
+    _bannerLista.push({ _docId: docId, imagem, titulo, sub, ordem });
+    banner_renderAdmin();
+    banner_render(_bannerLista);
+    banner_removerPreview();
+    document.getElementById('bnTitulo').value = '';
+    document.getElementById('bnSub').value = '';
+    const ok = document.getElementById('okBanner');
+    ok.style.display='block'; setTimeout(()=>ok.style.display='none',2500);
+  } catch(e) {
+    console.error('Erro ao salvar banner:', e);
+    alert('Erro ao salvar banner: ' + e.message);
+  } finally {
+    btnAdd.disabled = false; btnAdd.textContent = '➕ Adicionar banner';
+  }
 }
 
 async function banner_remover(i) {
   if (!confirm('Remover este banner?')) return;
+  const docId = _bannerLista[i]._docId;
+  await fb_deleteBanner(docId);
   _bannerLista.splice(i, 1);
-  await fb_setBanners(_bannerLista);
   banner_renderAdmin();
   banner_render(_bannerLista);
 }
@@ -2348,7 +2404,13 @@ async function banner_mover(i, dir) {
   const j = i + dir;
   if (j < 0 || j >= _bannerLista.length) return;
   [_bannerLista[i], _bannerLista[j]] = [_bannerLista[j], _bannerLista[i]];
-  await fb_setBanners(_bannerLista);
+  // Atualiza ordem nos dois documentos
+  await Promise.all([
+    fb_updateBannerOrdem(_bannerLista[i]._docId, i),
+    fb_updateBannerOrdem(_bannerLista[j]._docId, j),
+  ]);
+  _bannerLista[i].ordem = i;
+  _bannerLista[j].ordem = j;
   banner_renderAdmin();
   banner_render(_bannerLista);
 }
