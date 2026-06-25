@@ -15,8 +15,6 @@
   <link rel="apple-touch-icon" href="logo.png"/>
 
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -133,9 +131,9 @@
     /* Modal de corte de imagem */
     .crop-overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.92); z-index: 9999;
+      background: rgba(0,0,0,0.95); z-index: 9999;
       flex-direction: column; align-items: center; justify-content: center;
-      padding: 16px;
+      padding: 12px;
     }
     .crop-overlay.aberto { display: flex; }
     .crop-box {
@@ -143,33 +141,50 @@
       width: 100%; max-width: 560px; overflow: hidden;
     }
     .crop-header {
-      padding: 16px 20px; display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     .crop-header h3 { color: #fff; font-size: 1rem; font-weight: 700; }
-    .crop-header p { color: rgba(255,255,255,0.6); font-size: 0.78rem; margin-top: 2px; }
-    .crop-img-wrap {
-      position: relative; max-height: 55vh; background: #000; overflow: hidden;
+    .crop-header p  { color: rgba(255,255,255,0.55); font-size: 0.75rem; margin-top: 3px; }
+    .crop-container {
+      position: relative; overflow: hidden;
+      aspect-ratio: 16/6; background: #000;
+      cursor: grab; touch-action: none;
     }
-    .crop-img-wrap img { display: block; max-width: 100%; }
+    .crop-container:active { cursor: grabbing; }
+    #cropImg {
+      position: absolute; transform-origin: 0 0;
+      pointer-events: none; user-select: none;
+      -webkit-user-drag: none; display: block;
+    }
+    .crop-grid {
+      position: absolute; inset: 0; pointer-events: none;
+      border: 2px solid rgba(255,255,255,0.8);
+      background:
+        linear-gradient(rgba(255,255,255,0.15) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.15) 1px, transparent 1px);
+      background-size: 33.3% 33.3%;
+    }
     .crop-footer {
-      padding: 14px 20px; display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; display: flex; align-items: center; gap: 8px;
       border-top: 1px solid rgba(255,255,255,0.1);
+      flex-wrap: wrap;
     }
-    .crop-ratio-btn {
-      padding: 6px 12px; border-radius: 20px; border: 1.5px solid rgba(255,255,255,0.25);
-      background: none; color: rgba(255,255,255,0.7); font-family: inherit;
-      font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+    .crop-zoom-btn {
+      width: 36px; height: 36px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.08); color: #fff; font-size: 1.2rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-family: inherit; line-height: 1;
     }
-    .crop-ratio-btn.ativo { background: var(--roxo); border-color: var(--roxo); color: #fff; }
+    .crop-hint { color: rgba(255,255,255,0.45); font-size: 0.72rem; flex: 1; }
     .crop-btn-cancel {
-      margin-left: auto; padding: 10px 20px; border-radius: 10px;
+      padding: 9px 16px; border-radius: 10px;
       border: 1.5px solid rgba(255,255,255,0.25); background: none;
-      color: rgba(255,255,255,0.8); font-family: inherit; font-size: 0.9rem;
+      color: rgba(255,255,255,0.8); font-family: inherit; font-size: 0.88rem;
       font-weight: 600; cursor: pointer;
     }
     .crop-btn-ok {
-      padding: 10px 20px; border-radius: 10px; border: none;
+      padding: 9px 18px; border-radius: 10px; border: none;
       background: linear-gradient(135deg, var(--roxo), var(--rosa));
       color: #fff; font-family: inherit; font-size: 0.9rem;
       font-weight: 700; cursor: pointer;
@@ -2492,67 +2507,145 @@ function banner_renderAdmin() {
   `).join('');
 }
 
-let _cropResolve = null;
-let _cropperInst = null;
-let _bnImagemCortada = null; // base64 já cortado, pronto para salvar
+let _bnImagemCortada = null;
+const _cs = { x:0, y:0, scale:1, resolve:null, dragging:false, lx:0, ly:0, pinchD:0 };
 
 function banner_preview(input) {
   if (!input.files || !input.files[0]) return;
   crop_abrir(input.files[0]).then(base64 => {
-    if (!base64) return; // cancelou
+    if (!base64) return;
     _bnImagemCortada = base64;
     document.getElementById('bnImgPreview').src = base64;
     document.getElementById('bnImgPreviewWrap').style.display = 'block';
   });
 }
 
-// ── Crop ─────────────────────────────────────────────────────────
+// ── Crop sem biblioteca externa ───────────────────────────────────
 function crop_abrir(file) {
   return new Promise(resolve => {
-    _cropResolve = resolve;
+    _cs.resolve = resolve;
     const url = URL.createObjectURL(file);
-    const img  = document.getElementById('cropImg');
-    // Destrói instância anterior
-    if (_cropperInst) { _cropperInst.destroy(); _cropperInst = null; }
-    img.src = url;
-    document.getElementById('cropOverlay').classList.add('aberto');
+    const img = document.getElementById('cropImg');
     img.onload = () => {
       URL.revokeObjectURL(url);
-      _cropperInst = new Cropper(img, {
-        aspectRatio: 16 / 6,
-        viewMode: 1,
-        responsive: true,
-        movable: true,
-        zoomable: true,
-        rotatable: false,
-        scalable: false,
-        autoCropArea: 1,
-      });
+      const con = document.getElementById('cropContainer');
+      const cw = con.clientWidth, ch = con.clientHeight;
+      // Escala para cobrir o container
+      const sc = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+      _cs.scale = sc;
+      _cs.x = (cw - img.naturalWidth  * sc) / 2;
+      _cs.y = (ch - img.naturalHeight * sc) / 2;
+      _crop_apply();
+      document.getElementById('cropOverlay').classList.add('aberto');
+      _crop_eventos();
     };
+    img.src = url;
   });
 }
 
-function crop_setRatio(ratio, btn) {
-  if (!_cropperInst) return;
-  _cropperInst.setAspectRatio(isNaN(ratio) ? NaN : ratio);
-  document.querySelectorAll('.crop-ratio-btn').forEach(b => b.classList.remove('ativo'));
-  btn.classList.add('ativo');
+function _crop_apply() {
+  const img = document.getElementById('cropImg');
+  img.style.width  = (_cs.scale * img.naturalWidth)  + 'px';
+  img.style.height = (_cs.scale * img.naturalHeight) + 'px';
+  img.style.left   = _cs.x + 'px';
+  img.style.top    = _cs.y + 'px';
+}
+
+function _crop_clamp() {
+  const con = document.getElementById('cropContainer');
+  const img = document.getElementById('cropImg');
+  const iw = _cs.scale * img.naturalWidth;
+  const ih = _cs.scale * img.naturalHeight;
+  const cw = con.clientWidth, ch = con.clientHeight;
+  _cs.x = Math.min(0, Math.max(cw - iw, _cs.x));
+  _cs.y = Math.min(0, Math.max(ch - ih, _cs.y));
+}
+
+function crop_zoom(delta) {
+  const con = document.getElementById('cropContainer');
+  const img = document.getElementById('cropImg');
+  const cw = con.clientWidth, ch = con.clientHeight;
+  const minSc = Math.max(cw / img.naturalWidth, ch / img.naturalHeight);
+  _cs.scale = Math.max(minSc, Math.min(5, _cs.scale + delta * _cs.scale));
+  _cs.x = (cw - img.naturalWidth  * _cs.scale) / 2;
+  _cs.y = (ch - img.naturalHeight * _cs.scale) / 2;
+  _crop_apply();
+}
+
+function _crop_eventos() {
+  const con = document.getElementById('cropContainer');
+  if (con.dataset.evOk) return; // já inicializado
+  con.dataset.evOk = '1';
+
+  // Mouse
+  con.addEventListener('mousedown',  e => { _cs.dragging=true; _cs.lx=e.clientX; _cs.ly=e.clientY; e.preventDefault(); });
+  con.addEventListener('mousemove',  e => {
+    if (!_cs.dragging) return;
+    _cs.x+=e.clientX-_cs.lx; _cs.y+=e.clientY-_cs.ly;
+    _cs.lx=e.clientX; _cs.ly=e.clientY;
+    _crop_clamp(); _crop_apply();
+  });
+  con.addEventListener('mouseup',    () => { _cs.dragging=false; });
+  con.addEventListener('mouseleave', () => { _cs.dragging=false; });
+
+  // Touch
+  con.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length===1) {
+      _cs.dragging=true; _cs.lx=e.touches[0].clientX; _cs.ly=e.touches[0].clientY;
+    } else if (e.touches.length===2) {
+      _cs.dragging=false;
+      _cs.pinchD = Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY
+      );
+    }
+  }, { passive:false });
+  con.addEventListener('touchmove', e => {
+    e.preventDefault();
+    const img = document.getElementById('cropImg');
+    if (e.touches.length===1 && _cs.dragging) {
+      _cs.x+=e.touches[0].clientX-_cs.lx; _cs.y+=e.touches[0].clientY-_cs.ly;
+      _cs.lx=e.touches[0].clientX; _cs.ly=e.touches[0].clientY;
+      _crop_clamp(); _crop_apply();
+    } else if (e.touches.length===2) {
+      const d = Math.hypot(
+        e.touches[0].clientX-e.touches[1].clientX,
+        e.touches[0].clientY-e.touches[1].clientY
+      );
+      const cw=con.clientWidth, ch=con.clientHeight;
+      const minSc = Math.max(cw/img.naturalWidth, ch/img.naturalHeight);
+      _cs.scale = Math.max(minSc, Math.min(5, _cs.scale * (d/_cs.pinchD)));
+      _cs.pinchD = d;
+      _cs.x = (cw - img.naturalWidth  * _cs.scale) / 2;
+      _cs.y = (ch - img.naturalHeight * _cs.scale) / 2;
+      _crop_clamp(); _crop_apply();
+    }
+  }, { passive:false });
+  con.addEventListener('touchend', () => { _cs.dragging=false; });
 }
 
 function crop_confirmar() {
-  if (!_cropperInst || !_cropResolve) return;
-  const canvas = _cropperInst.getCroppedCanvas({ maxWidth: 1200, maxHeight: 600, imageSmoothingQuality: 'high' });
-  const base64 = canvas.toDataURL('image/jpeg', 0.80);
-  _cropperInst.destroy(); _cropperInst = null;
+  if (!_cs.resolve) return;
+  const con = document.getElementById('cropContainer');
+  const img = document.getElementById('cropImg');
+  const cw = con.clientWidth, ch = con.clientHeight;
+  const outW = 1200, outH = Math.round(1200 * ch / cw);
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const srcX = -_cs.x / _cs.scale;
+  const srcY = -_cs.y / _cs.scale;
+  const srcW =  cw   / _cs.scale;
+  const srcH =  ch   / _cs.scale;
+  canvas.getContext('2d').drawImage(img, srcX, srcY, srcW, srcH, 0, 0, outW, outH);
+  const base64 = canvas.toDataURL('image/jpeg', 0.82);
   document.getElementById('cropOverlay').classList.remove('aberto');
-  _cropResolve(base64); _cropResolve = null;
+  _cs.resolve(base64); _cs.resolve = null;
 }
 
 function crop_cancelar() {
-  if (_cropperInst) { _cropperInst.destroy(); _cropperInst = null; }
   document.getElementById('cropOverlay').classList.remove('aberto');
-  if (_cropResolve) { _cropResolve(null); _cropResolve = null; }
-  // Limpa o input
+  if (_cs.resolve) { _cs.resolve(null); _cs.resolve = null; }
   document.getElementById('bnImagem').value = '';
 }
 
@@ -3022,19 +3115,17 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
 <div class="crop-overlay" id="cropOverlay">
   <div class="crop-box">
     <div class="crop-header">
-      <div>
-        <h3>✂️ Recortar imagem</h3>
-        <p>Arraste e redimensione a área de seleção</p>
-      </div>
+      <h3>✂️ Enquadrar banner</h3>
+      <p>Arraste para posicionar • Belisque para zoom</p>
     </div>
-    <div class="crop-img-wrap">
-      <img id="cropImg" src="" alt="Imagem para cortar"/>
+    <div class="crop-container" id="cropContainer">
+      <img id="cropImg" src="" alt=""/>
+      <div class="crop-grid"></div>
     </div>
     <div class="crop-footer">
-      <span style="color:rgba(255,255,255,0.6);font-size:0.75rem;font-weight:600">Proporção:</span>
-      <button class="crop-ratio-btn ativo" onclick="crop_setRatio(16/6, this)">Banner</button>
-      <button class="crop-ratio-btn" onclick="crop_setRatio(1, this)">Quadrado</button>
-      <button class="crop-ratio-btn" onclick="crop_setRatio(NaN, this)">Livre</button>
+      <button class="crop-zoom-btn" onclick="crop_zoom(-0.15)" title="Diminuir">−</button>
+      <button class="crop-zoom-btn" onclick="crop_zoom(0.15)" title="Aumentar">+</button>
+      <span class="crop-hint">Arraste a foto para ajustar</span>
       <button class="crop-btn-cancel" onclick="crop_cancelar()">Cancelar</button>
       <button class="crop-btn-ok" onclick="crop_confirmar()">Usar ✓</button>
     </div>
