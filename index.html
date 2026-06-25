@@ -19,6 +19,7 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -106,7 +107,7 @@
       justify-content: center; font-size: 0.75rem; font-weight: 700;
     }
 
-    /* HERO */
+    /* HERO / BANNER CAROUSEL */
     .hero {
       background: linear-gradient(135deg, var(--roxo) 0%, var(--rosa) 60%, var(--laranja) 100%);
       padding: 64px 24px; text-align: center; color: #fff;
@@ -126,6 +127,184 @@
     }
     .hero h1 em { font-style: normal; color: var(--amarelo); }
     .hero p { font-size: 1.1rem; opacity: 0.90; max-width: 480px; margin: 0 auto; }
+
+    /* Banner carousel */
+    .banner-carousel {
+      position: relative; width: 100%; overflow: hidden;
+      max-height: 420px; background: #111;
+    }
+    .banner-track {
+      display: flex; transition: transform 0.5s cubic-bezier(.4,0,.2,1);
+      will-change: transform;
+    }
+    .banner-slide {
+      min-width: 100%; position: relative;
+      max-height: 420px; overflow: hidden;
+    }
+    .banner-slide img {
+      width: 100%; height: 100%; object-fit: cover;
+      display: block; max-height: 420px;
+    }
+    .banner-slide-text {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.1) 60%, transparent 100%);
+      color: #fff; text-align: center; padding: 24px;
+    }
+    .banner-slide-text h2 {
+      font-size: clamp(1.5rem, 4vw, 2.8rem); font-weight: 800;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.5); margin-bottom: 8px;
+    }
+    .banner-slide-text p {
+      font-size: clamp(0.9rem, 2vw, 1.1rem); opacity: 0.95;
+      text-shadow: 0 1px 6px rgba(0,0,0,0.5); max-width: 480px;
+    }
+    .banner-arrow {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      background: rgba(255,255,255,0.2); backdrop-filter: blur(4px);
+      border: none; color: #fff; font-size: 1.4rem; cursor: pointer;
+      width: 44px; height: 44px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s; z-index: 10;
+    }
+    .banner-arrow:hover { background: rgba(255,255,255,0.38); }
+    .banner-arrow.prev { left: 14px; }
+    .banner-arrow.next { right: 14px; }
+    .banner-dots {
+      position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 7px; z-index: 10;
+    }
+    .banner-dot {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: rgba(255,255,255,0.5); border: none; cursor: pointer;
+      transition: background 0.2s, transform 0.2s; padding: 0;
+    }
+    .banner-dot.ativo { background: #fff; transform: scale(1.25); }
+
+    /* Modal cliente */
+    .cli-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 2000;
+      align-items: center; justify-content: center;
+      padding: 16px;
+    }
+    .cli-modal-overlay.aberto { display: flex; }
+    .cli-modal {
+      background: #fff; border-radius: 20px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      overflow: hidden; animation: fadeUp 0.25s ease;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .cli-modal-header {
+      background: linear-gradient(135deg, var(--roxo), var(--rosa));
+      padding: 24px; color: #fff; text-align: center;
+    }
+    .cli-modal-header h3 { font-size: 1.3rem; font-weight: 800; }
+    .cli-modal-header p { font-size: 0.85rem; opacity: 0.9; margin-top: 4px; }
+    .cli-tabs {
+      display: flex; border-bottom: 2px solid var(--border);
+    }
+    .cli-tab {
+      flex: 1; padding: 13px; background: none; border: none;
+      font-family: inherit; font-size: 0.9rem; font-weight: 600;
+      color: var(--cinza); cursor: pointer; transition: color 0.2s;
+      border-bottom: 2px solid transparent; margin-bottom: -2px;
+    }
+    .cli-tab.ativo { color: var(--roxo); border-bottom-color: var(--roxo); }
+    .cli-modal-body { padding: 20px; }
+    .cli-field { margin-bottom: 14px; }
+    .cli-field label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--cinza); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .cli-field input {
+      width: 100%; padding: 11px 14px; border: 2px solid var(--border);
+      border-radius: 10px; font-family: inherit; font-size: 0.92rem;
+      outline: none; transition: border-color 0.2s;
+    }
+    .cli-field input:focus { border-color: var(--roxo); }
+    .cli-btn-primary {
+      width: 100%; padding: 13px; border: none; border-radius: 12px;
+      background: linear-gradient(135deg, var(--roxo), var(--rosa));
+      color: #fff; font-family: inherit; font-size: 1rem; font-weight: 700;
+      cursor: pointer; margin-bottom: 10px; transition: opacity 0.2s;
+    }
+    .cli-btn-primary:hover { opacity: 0.9; }
+    .cli-btn-primary:disabled { opacity: 0.6; cursor: default; }
+    .cli-btn-google {
+      width: 100%; padding: 12px; border: 2px solid var(--border);
+      border-radius: 12px; background: #fff; font-family: inherit;
+      font-size: 0.95rem; font-weight: 600; color: var(--escuro);
+      cursor: pointer; display: flex; align-items: center;
+      justify-content: center; gap: 10px; transition: border-color 0.2s;
+      margin-bottom: 10px;
+    }
+    .cli-btn-google:hover { border-color: var(--roxo); }
+    .cli-divider {
+      text-align: center; color: var(--cinza); font-size: 0.8rem;
+      margin: 12px 0; position: relative;
+    }
+    .cli-divider::before, .cli-divider::after {
+      content: ''; position: absolute; top: 50%; width: 42%;
+      height: 1px; background: var(--border);
+    }
+    .cli-divider::before { left: 0; }
+    .cli-divider::after { right: 0; }
+    .cli-erro { background: #FFE8E8; color: #C62828; border: 1px solid #FFCDD2; border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; font-weight: 600; margin-bottom: 12px; display: none; }
+    .cli-ok { background: #E8FFF6; color: #00695C; border: 1px solid #B2DFDB; border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; font-weight: 600; margin-bottom: 12px; display: none; }
+    .cli-modal-close { position: absolute; top: 14px; right: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; font-size: 1.1rem; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    /* Perfil do cliente */
+    .perfil-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55); z-index: 2000;
+      align-items: flex-end; justify-content: center;
+    }
+    .perfil-overlay.aberto { display: flex; }
+    .perfil-sheet {
+      background: #fff; border-radius: 24px 24px 0 0;
+      width: 100%; max-width: 600px;
+      max-height: 90vh; overflow-y: auto;
+      animation: slideUp 0.3s ease;
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+    @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .perfil-header {
+      background: linear-gradient(135deg, var(--roxo), var(--rosa));
+      padding: 24px; color: #fff; display: flex; align-items: center; gap: 16px;
+      border-radius: 24px 24px 0 0;
+    }
+    .perfil-avatar {
+      width: 56px; height: 56px; border-radius: 50%;
+      background: rgba(255,255,255,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; font-weight: 800; color: #fff;
+      overflow: hidden;
+    }
+    .perfil-avatar img { width: 100%; height: 100%; object-fit: cover; }
+    .perfil-nome { font-size: 1.1rem; font-weight: 700; }
+    .perfil-email { font-size: 0.8rem; opacity: 0.85; }
+    .perfil-close { margin-left: auto; background: rgba(255,255,255,0.2); border: none; color: #fff; font-size: 1.1rem; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .perfil-body { padding: 20px; }
+    .perfil-section { margin-bottom: 24px; }
+    .perfil-section h4 { font-size: 0.8rem; font-weight: 700; color: var(--cinza); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .perfil-field { margin-bottom: 12px; }
+    .perfil-field label { display: block; font-size: 0.75rem; font-weight: 600; color: var(--cinza); margin-bottom: 4px; }
+    .perfil-field input { width: 100%; padding: 10px 13px; border: 2px solid var(--border); border-radius: 10px; font-family: inherit; font-size: 0.9rem; outline: none; }
+    .perfil-field input:focus { border-color: var(--roxo); }
+    .perfil-btn-save { padding: 11px 24px; border: none; border-radius: 10px; background: linear-gradient(135deg, var(--roxo), var(--rosa)); color: #fff; font-family: inherit; font-weight: 700; font-size: 0.9rem; cursor: pointer; }
+    .perfil-btn-logout { padding: 11px 24px; border: 2px solid var(--border); border-radius: 10px; background: #fff; font-family: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; color: var(--cinza); }
+    .perfil-pedido-card { background: var(--bg); border-radius: 12px; padding: 14px; margin-bottom: 10px; font-size: 0.85rem; }
+    .perfil-pedido-card strong { font-size: 0.92rem; }
+
+    /* Botão Entrar no header */
+    .entrar-btn {
+      background: rgba(255,255,255,0.18); border: 1.5px solid rgba(255,255,255,0.5);
+      color: #fff; border-radius: 50px; padding: 8px 18px;
+      font-family: inherit; font-size: 0.85rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 7px;
+      transition: background 0.2s; white-space: nowrap;
+    }
+    .entrar-btn:hover { background: rgba(255,255,255,0.28); }
 
     /* FILTROS */
     .filtros-wrap { padding: 32px 24px 8px; max-width: 1200px; margin: 0 auto; }
@@ -597,6 +776,8 @@
     ════════════════════════════════════════════════ */
     @media (max-width: 600px) {
       .search-bar { display: none; }
+      .entrar-btn span { display: none; } /* mostra só ícone em mobile */
+      .entrar-btn { padding: 8px 10px; }
       .hero { padding: 36px 16px; }
       .hero h1 { font-size: 1.6rem; }
       .hero p  { font-size: 0.9rem; }
@@ -744,16 +925,28 @@
         <input id="inputBusca" type="text" placeholder="Buscar roupas, acessórios..." oninput="filtrar()"/>
         <button>🔍</button>
       </div>
+      <button class="entrar-btn" id="btnEntrar" onclick="cli_abrirModal()">
+        👤 <span id="btnEntrarTxt">Entrar</span>
+      </button>
       <button class="cart-btn" onclick="abrirCarrinho()">
         🛒 Carrinho <span class="cart-count" id="cartCount">0</span>
       </button>
     </div>
   </header>
 
-  <section class="hero">
+  <!-- Hero padrão (exibido quando não há banners) -->
+  <section class="hero" id="heroDefault">
     <h1 id="heroTitulo">Tudo que você ama,<br/>num só <em>lugar</em> ✨</h1>
     <p id="heroSubtitulo">Roupas, itens de casa, acessórios e muito mais. Qualidade e estilo para toda a família!</p>
   </section>
+
+  <!-- Banner carousel (exibido quando há banners cadastrados) -->
+  <div class="banner-carousel" id="bannerCarousel" style="display:none">
+    <div class="banner-track" id="bannerTrack"></div>
+    <button class="banner-arrow prev" onclick="banner_nav(-1)">&#8249;</button>
+    <button class="banner-arrow next" onclick="banner_nav(1)">&#8250;</button>
+    <div class="banner-dots" id="bannerDots"></div>
+  </div>
 
   <div class="filtros-wrap">
     <h2>🏷️ Categorias</h2>
@@ -1046,6 +1239,28 @@
         </div>
       </div>
 
+      <!-- BANNERS -->
+      <div class="adm-cfg-section">
+        <h3>🖼️ Banners do Site</h3>
+        <p style="color:var(--cinza);font-size:0.82rem;margin-bottom:14px">Imagens que ficam rotacionando na página inicial.</p>
+        <div id="cfgBannerLista" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px"></div>
+        <div style="border:2px dashed var(--border);border-radius:12px;padding:16px">
+          <p style="font-size:0.8rem;font-weight:600;color:var(--cinza);margin-bottom:10px">Adicionar banner</p>
+          <div class="adm-field"><label>Imagem</label>
+            <div id="bnImgPreviewWrap" style="display:none;margin-bottom:8px;position:relative;max-width:200px">
+              <img id="bnImgPreview" src="" style="width:100%;border-radius:10px;object-fit:cover;max-height:100px;border:2px solid var(--border)"/>
+              <button type="button" onclick="banner_removerPreview()" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.55);color:#fff;border:none;border-radius:50%;width:24px;height:24px;cursor:pointer;font-size:0.85rem;display:flex;align-items:center;justify-content:center">✕</button>
+            </div>
+            <input type="file" id="bnImagem" accept="image/*" style="display:none" onchange="banner_preview(this)"/>
+            <button type="button" onclick="document.getElementById('bnImagem').click()" style="background:var(--bg);border:2px dashed var(--border);border-radius:10px;padding:9px 16px;cursor:pointer;font-family:inherit;font-size:0.83rem;color:var(--cinza);width:100%">📷 Escolher imagem</button>
+          </div>
+          <div class="adm-field"><label>Título (opcional)</label><input type="text" id="bnTitulo" placeholder="Ex: Nova coleção chegou!"/></div>
+          <div class="adm-field"><label>Subtítulo (opcional)</label><input type="text" id="bnSub" placeholder="Ex: Até 50% off em roupas"/></div>
+          <button class="adm-btn-cfg" onclick="banner_adicionar()" style="margin-top:4px">➕ Adicionar banner</button>
+          <div class="adm-alert-ok" id="okBanner">✅ Banner salvo!</div>
+        </div>
+      </div>
+
       <div class="adm-cfg-section">
         <h3>🗑️ Dados</h3>
         <p style="color:var(--cinza);font-size:0.82rem;margin-bottom:12px">Ações irreversíveis — use com cuidado.</p>
@@ -1187,12 +1402,63 @@ const FB_CFG = {
 };
 
 let _db = null;
+let _auth = null;
+let _cliUser = null; // usuário Firebase Auth logado
 
 function fb_init() {
   try {
     if (!firebase.apps.length) firebase.initializeApp(FB_CFG);
-    _db = firebase.firestore();
+    _db   = firebase.firestore();
+    _auth = firebase.auth();
+    // Escuta mudanças de estado de login do cliente
+    _auth.onAuthStateChanged(user => {
+      _cliUser = user;
+      cli_atualizarHeaderBtn();
+    });
   } catch(e) { console.error('Firebase init:', e); }
+}
+
+// ── Firebase Auth (clientes) ─────────────────────────────────────
+async function fb_cliLogin(email, senha) {
+  return await _auth.signInWithEmailAndPassword(email, senha);
+}
+async function fb_cliCadastrar(email, senha) {
+  return await _auth.createUserWithEmailAndPassword(email, senha);
+}
+async function fb_cliGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  return await _auth.signInWithPopup(provider);
+}
+async function fb_cliLogout() {
+  await _auth.signOut();
+}
+async function fb_cliResetSenha(email) {
+  await _auth.sendPasswordResetEmail(email);
+}
+async function fb_cliSalvarPerfil(uid, dados) {
+  if (!_db) return;
+  await _db.collection('clientes').doc(uid).set(dados, { merge: true });
+}
+async function fb_cliGetPerfil(uid) {
+  if (!_db) return null;
+  const doc = await _db.collection('clientes').doc(uid).get();
+  return doc.exists ? doc.data() : null;
+}
+async function fb_cliGetPedidos(uid) {
+  if (!_db) return [];
+  const snap = await _db.collection('pedidos').where('clienteUid','==',uid).get();
+  return snap.docs.map(d=>d.data()).sort((a,b)=>new Date(b.data)-new Date(a.data));
+}
+
+// ── Firebase Banners ─────────────────────────────────────────────
+async function fb_getBanners() {
+  if (!_db) return [];
+  const doc = await _db.collection('config').doc('banners').get();
+  return doc.exists ? (doc.data().lista || []) : [];
+}
+async function fb_setBanners(lista) {
+  if (!_db) return;
+  await _db.collection('config').doc('banners').set({ lista });
 }
 
 // Comprime e converte imagem para base64 (max 600px, JPEG 75%)
@@ -1527,6 +1793,58 @@ window.addEventListener('hashchange', () => {
 });
 
 // ════════════════════════════════════════════════
+//  BANNER CAROUSEL
+// ════════════════════════════════════════════════
+let _banners = [];
+let _bannerIdx = 0;
+let _bannerTimer = null;
+
+function banner_render(lista) {
+  _banners = lista || [];
+  const carousel = document.getElementById('bannerCarousel');
+  const heroDefault = document.getElementById('heroDefault');
+  if (!_banners.length) {
+    carousel.style.display = 'none';
+    heroDefault.style.display = '';
+    return;
+  }
+  carousel.style.display = '';
+  heroDefault.style.display = 'none';
+  document.getElementById('bannerTrack').innerHTML = _banners.map((b,i) => `
+    <div class="banner-slide">
+      <img src="${b.imagem}" alt="${b.titulo||'Banner'}"/>
+      ${(b.titulo||b.sub) ? `<div class="banner-slide-text">
+        ${b.titulo ? `<h2>${b.titulo}</h2>` : ''}
+        ${b.sub    ? `<p>${b.sub}</p>`        : ''}
+      </div>` : ''}
+    </div>
+  `).join('');
+  document.getElementById('bannerDots').innerHTML = _banners.map((_,i) =>
+    `<button class="banner-dot${i===0?' ativo':''}" onclick="banner_ir(${i})"></button>`
+  ).join('');
+  banner_ir(0);
+  banner_autoplay();
+}
+
+function banner_ir(idx) {
+  _bannerIdx = (idx + _banners.length) % _banners.length;
+  document.getElementById('bannerTrack').style.transform = `translateX(-${_bannerIdx*100}%)`;
+  document.querySelectorAll('.banner-dot').forEach((d,i) => d.classList.toggle('ativo', i===_bannerIdx));
+}
+
+function banner_nav(dir) {
+  banner_ir(_bannerIdx + dir);
+  banner_autoplay(); // reinicia timer
+}
+
+function banner_autoplay() {
+  if (_bannerTimer) clearInterval(_bannerTimer);
+  if (_banners.length > 1) {
+    _bannerTimer = setInterval(() => banner_ir(_bannerIdx + 1), 5000);
+  }
+}
+
+// ════════════════════════════════════════════════
 //  LOJA
 // ════════════════════════════════════════════════
 const _cfg = getCfg();
@@ -1644,7 +1962,10 @@ function salvarPedido(canal) {
   if (!itens.length) return null;
   const pedido = { id:Date.now(), data:new Date().toISOString(),
     itens: itens.map(i=>({id:i.id,nome:i.nome,emoji:i.emoji,preco:i.preco,qty:i.qty})),
-    total: itens.reduce((s,i)=>s+i.preco*i.qty,0), status:'novo', canal };
+    total: itens.reduce((s,i)=>s+i.preco*i.qty,0), status:'novo', canal,
+    clienteUid: _cliUser ? _cliUser.uid : null,
+    clienteEmail: _cliUser ? _cliUser.email : null,
+  };
   const lista = getPed(); lista.push(pedido); save(K.ped, lista);
   fb_setPed(pedido); // async, fire-and-forget
   return pedido;
@@ -1766,6 +2087,270 @@ function adm_renderProdutos() {
       </tr>`).join('');
   // Limpa barra ao re-renderizar
   adm_limparSelecao('prod');
+}
+
+// ════════════════════════════════════════════════
+//  CLIENTE — LOGIN / PERFIL
+// ════════════════════════════════════════════════
+
+function cli_atualizarHeaderBtn() {
+  const btn = document.getElementById('btnEntrarTxt');
+  if (!btn) return;
+  if (_cliUser) {
+    const nome = _cliUser.displayName || _cliUser.email.split('@')[0];
+    btn.textContent = nome.split(' ')[0];
+    document.getElementById('btnEntrar').onclick = cli_abrirPerfil;
+  } else {
+    btn.textContent = 'Entrar';
+    document.getElementById('btnEntrar').onclick = cli_abrirModal;
+  }
+}
+
+function cli_abrirModal() {
+  document.getElementById('cliModalOverlay').classList.add('aberto');
+  cli_limparMsgs();
+}
+function cli_fecharModal() {
+  document.getElementById('cliModalOverlay').classList.remove('aberto');
+}
+function cli_mudarAba(aba) {
+  document.getElementById('cliFormLogin').style.display = aba==='login' ? '' : 'none';
+  document.getElementById('cliFormCad').style.display   = aba==='cadastro' ? '' : 'none';
+  document.getElementById('cliTabLogin').classList.toggle('ativo', aba==='login');
+  document.getElementById('cliTabCad').classList.toggle('ativo', aba==='cadastro');
+  cli_limparMsgs();
+}
+function cli_limparMsgs() {
+  ['cliErro','cliOk'].forEach(id => { const el=document.getElementById(id); el.style.display='none'; el.textContent=''; });
+}
+function cli_mostrarErro(msg) {
+  const el=document.getElementById('cliErro'); el.textContent=msg; el.style.display='block';
+  document.getElementById('cliOk').style.display='none';
+}
+function cli_mostrarOk(msg) {
+  const el=document.getElementById('cliOk'); el.textContent=msg; el.style.display='block';
+  document.getElementById('cliErro').style.display='none';
+}
+
+async function cli_login() {
+  const email = document.getElementById('cliLoginEmail').value.trim();
+  const senha = document.getElementById('cliLoginSenha').value;
+  if (!email||!senha) return cli_mostrarErro('Preencha e-mail e senha.');
+  try {
+    await fb_cliLogin(email, senha);
+    cli_fecharModal();
+  } catch(e) {
+    cli_mostrarErro(e.code==='auth/wrong-password'||e.code==='auth/user-not-found' ? 'E-mail ou senha incorretos.' : 'Erro ao entrar. Tente novamente.');
+  }
+}
+
+async function cli_cadastrar() {
+  const nome  = document.getElementById('cliCadNome').value.trim();
+  const email = document.getElementById('cliCadEmail').value.trim();
+  const senha = document.getElementById('cliCadSenha').value;
+  if (!nome||!email||!senha) return cli_mostrarErro('Preencha todos os campos.');
+  if (senha.length < 6) return cli_mostrarErro('Senha deve ter ao menos 6 caracteres.');
+  try {
+    const cred = await fb_cliCadastrar(email, senha);
+    await cred.user.updateProfile({ displayName: nome });
+    await fb_cliSalvarPerfil(cred.user.uid, { nome, email, criadoEm: new Date().toISOString() });
+    cli_fecharModal();
+  } catch(e) {
+    cli_mostrarErro(e.code==='auth/email-already-in-use' ? 'Este e-mail já está em uso.' : 'Erro ao criar conta. Tente novamente.');
+  }
+}
+
+async function cli_loginGoogle() {
+  try {
+    const cred = await fb_cliGoogle();
+    const u = cred.user;
+    await fb_cliSalvarPerfil(u.uid, { nome: u.displayName, email: u.email, foto: u.photoURL||null, criadoEm: new Date().toISOString() });
+    cli_fecharModal();
+  } catch(e) {
+    cli_mostrarErro('Erro ao entrar com Google.');
+  }
+}
+
+async function cli_resetSenha() {
+  const email = document.getElementById('cliLoginEmail').value.trim();
+  if (!email) return cli_mostrarErro('Digite seu e-mail no campo acima.');
+  try {
+    await fb_cliResetSenha(email);
+    cli_mostrarOk('E-mail de redefinição enviado!');
+  } catch(e) {
+    cli_mostrarErro('E-mail não encontrado.');
+  }
+}
+
+async function cli_abrirPerfil() {
+  if (!_cliUser) return cli_abrirModal();
+  document.getElementById('perfilOverlay').classList.add('aberto');
+  // Preenche header
+  const nome = _cliUser.displayName || _cliUser.email.split('@')[0];
+  document.getElementById('perfilNome').textContent = nome;
+  document.getElementById('perfilEmail').textContent = _cliUser.email;
+  const avatarEl = document.getElementById('perfilAvatar');
+  if (_cliUser.photoURL) {
+    avatarEl.innerHTML = `<img src="${_cliUser.photoURL}" alt="foto"/>`;
+  } else {
+    avatarEl.textContent = nome[0].toUpperCase();
+  }
+  // Carrega dados do perfil
+  const perfil = await fb_cliGetPerfil(_cliUser.uid);
+  if (perfil) {
+    document.getElementById('perfilCampoNome').value    = perfil.nome||'';
+    document.getElementById('perfilCampoTel').value     = perfil.tel||'';
+    document.getElementById('perfilCampoCep').value     = perfil.cep||'';
+    document.getElementById('perfilCampoRua').value     = perfil.rua||'';
+    document.getElementById('perfilCampoNum').value     = perfil.num||'';
+    document.getElementById('perfilCampoBairro').value  = perfil.bairro||'';
+    document.getElementById('perfilCampoCidade').value  = perfil.cidade||'';
+    document.getElementById('perfilCampoEstado').value  = perfil.estado||'';
+    document.getElementById('perfilCampoComp').value    = perfil.comp||'';
+  }
+  // Carrega pedidos
+  const pedidos = await fb_cliGetPedidos(_cliUser.uid);
+  const R = v => 'R$ ' + (v||0).toFixed(2).replace('.',',');
+  document.getElementById('perfilPedidos').innerHTML = pedidos.length === 0
+    ? `<p style="color:var(--cinza);font-size:0.85rem">Nenhum pedido ainda.</p>`
+    : pedidos.map(p => `
+      <div class="perfil-pedido-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <strong>#${String(p.id).slice(-4)}</strong>
+          <span class="adm-badge badge-cat">${p.status||'novo'}</span>
+        </div>
+        <div style="font-size:0.8rem;color:var(--cinza);margin-bottom:4px">${new Date(p.data).toLocaleDateString('pt-BR')}</div>
+        <div style="font-size:0.82rem">${(p.itens||[]).map(i=>`${i.emoji||'📦'} ${i.nome} ×${i.qty}`).join(', ')}</div>
+        <div style="font-weight:700;margin-top:6px;color:var(--roxo)">${R(p.total)}</div>
+      </div>`).join('');
+}
+
+function cli_fecharPerfil() {
+  document.getElementById('perfilOverlay').classList.remove('aberto');
+}
+
+async function cli_salvarPerfil() {
+  if (!_cliUser) return;
+  const dados = {
+    nome:    document.getElementById('perfilCampoNome').value.trim(),
+    tel:     document.getElementById('perfilCampoTel').value.trim(),
+    cep:     document.getElementById('perfilCampoCep').value.trim(),
+    rua:     document.getElementById('perfilCampoRua').value.trim(),
+    num:     document.getElementById('perfilCampoNum').value.trim(),
+    bairro:  document.getElementById('perfilCampoBairro').value.trim(),
+    cidade:  document.getElementById('perfilCampoCidade').value.trim(),
+    estado:  document.getElementById('perfilCampoEstado').value.trim(),
+    comp:    document.getElementById('perfilCampoComp').value.trim(),
+  };
+  await fb_cliSalvarPerfil(_cliUser.uid, dados);
+  if (dados.nome) await _cliUser.updateProfile({ displayName: dados.nome });
+  document.getElementById('perfilNome').textContent = dados.nome || _cliUser.email.split('@')[0];
+  cli_atualizarHeaderBtn();
+  alert('✅ Dados salvos!');
+}
+
+async function cli_logout() {
+  if (!confirm('Sair da conta?')) return;
+  await fb_cliLogout();
+  cli_fecharPerfil();
+}
+
+async function cli_buscarCep(cep) {
+  cep = cep.replace(/\D/g,'');
+  if (cep.length !== 8) return;
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const d = await r.json();
+    if (!d.erro) {
+      document.getElementById('perfilCampoRua').value    = d.logradouro||'';
+      document.getElementById('perfilCampoBairro').value = d.bairro||'';
+      document.getElementById('perfilCampoCidade').value = d.localidade||'';
+      document.getElementById('perfilCampoEstado').value = d.uf||'';
+    }
+  } catch(e) {}
+}
+
+// ════════════════════════════════════════════════
+//  ADMIN — BANNERS
+// ════════════════════════════════════════════════
+
+let _bannerLista = [];
+
+async function banner_carregarAdmin() {
+  _bannerLista = await fb_getBanners();
+  banner_renderAdmin();
+}
+
+function banner_renderAdmin() {
+  const el = document.getElementById('cfgBannerLista');
+  if (!_bannerLista.length) {
+    el.innerHTML = `<p style="color:var(--cinza);font-size:0.82rem">Nenhum banner cadastrado.</p>`;
+    return;
+  }
+  el.innerHTML = _bannerLista.map((b,i) => `
+    <div style="display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:10px;padding:10px">
+      <img src="${b.imagem}" style="width:60px;height:40px;object-fit:cover;border-radius:7px;flex-shrink:0"/>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:0.85rem;font-weight:600;truncate">${b.titulo||'(sem título)'}</div>
+        ${b.sub ? `<div style="font-size:0.75rem;color:var(--cinza)">${b.sub}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:4px">
+        ${i>0 ? `<button onclick="banner_mover(${i},-1)" title="Subir" style="background:var(--border);border:none;border-radius:6px;padding:4px 8px;cursor:pointer">↑</button>` : ''}
+        ${i<_bannerLista.length-1 ? `<button onclick="banner_mover(${i},1)" title="Descer" style="background:var(--border);border:none;border-radius:6px;padding:4px 8px;cursor:pointer">↓</button>` : ''}
+        <button onclick="banner_remover(${i})" style="background:#FFE8E8;color:#C62828;border:none;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:0.85rem">🗑️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function banner_preview(input) {
+  if (!input.files || !input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('bnImgPreview').src = e.target.result;
+    document.getElementById('bnImgPreviewWrap').style.display = 'block';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function banner_removerPreview() {
+  document.getElementById('bnImagem').value = '';
+  document.getElementById('bnImgPreview').src = '';
+  document.getElementById('bnImgPreviewWrap').style.display = 'none';
+}
+
+async function banner_adicionar() {
+  const file = document.getElementById('bnImagem').files[0];
+  if (!file) return alert('Selecione uma imagem.');
+  const titulo = document.getElementById('bnTitulo').value.trim();
+  const sub    = document.getElementById('bnSub').value.trim();
+  const imagem = await adm_comprimirImagem(file, 1200, 0.80);
+  _bannerLista.push({ imagem, titulo, sub });
+  await fb_setBanners(_bannerLista);
+  banner_renderAdmin();
+  banner_render(_bannerLista); // atualiza na loja
+  banner_removerPreview();
+  document.getElementById('bnTitulo').value = '';
+  document.getElementById('bnSub').value = '';
+  const ok = document.getElementById('okBanner');
+  ok.style.display='block'; setTimeout(()=>ok.style.display='none',2500);
+}
+
+async function banner_remover(i) {
+  if (!confirm('Remover este banner?')) return;
+  _bannerLista.splice(i, 1);
+  await fb_setBanners(_bannerLista);
+  banner_renderAdmin();
+  banner_render(_bannerLista);
+}
+
+async function banner_mover(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= _bannerLista.length) return;
+  [_bannerLista[i], _bannerLista[j]] = [_bannerLista[j], _bannerLista[i]];
+  await fb_setBanners(_bannerLista);
+  banner_renderAdmin();
+  banner_render(_bannerLista);
 }
 
 let _editId = null;
@@ -1934,6 +2519,7 @@ async function adm_salvarEst(id) {
 }
 
 function adm_carregarCfg() {
+  banner_carregarAdmin(); // carrega banners
   const c = getCfg();
   document.getElementById('cfgNome').value    = c.nomeLoja;
   document.getElementById('cfgWpp').value     = c.wppNumero;
@@ -2162,10 +2748,105 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catc
   if (cfgFb.heroSub) document.getElementById('heroSubtitulo').textContent = cfgFb.heroSub;
   renderProdutos();
 
+  // Carrega banners
+  const banners = await fb_getBanners();
+  banner_render(banners);
+
   // Rota inicial
   if (location.hash === '#admin') showAdmin();
   else showStore();
 })();
 </script>
+
+<!-- MODAL LOGIN/CADASTRO CLIENTE -->
+<div class="cli-modal-overlay" id="cliModalOverlay" onclick="if(event.target===this)cli_fecharModal()">
+  <div class="cli-modal">
+    <div class="cli-modal-header" style="position:relative">
+      <h3 id="cliModalTit">Bem-vindo!</h3>
+      <p id="cliModalSub">Entre ou crie sua conta</p>
+      <button class="cli-modal-close" onclick="cli_fecharModal()">✕</button>
+    </div>
+    <div class="cli-tabs">
+      <button class="cli-tab ativo" id="cliTabLogin" onclick="cli_mudarAba('login')">Entrar</button>
+      <button class="cli-tab" id="cliTabCad" onclick="cli_mudarAba('cadastro')">Criar conta</button>
+    </div>
+    <div class="cli-modal-body">
+      <div id="cliErro" class="cli-erro"></div>
+      <div id="cliOk" class="cli-ok"></div>
+
+      <!-- Login -->
+      <div id="cliFormLogin">
+        <div class="cli-field"><label>E-mail</label><input type="email" id="cliLoginEmail" placeholder="seu@email.com"/></div>
+        <div class="cli-field"><label>Senha</label><input type="password" id="cliLoginSenha" placeholder="Sua senha"/></div>
+        <button class="cli-btn-primary" onclick="cli_login()">Entrar</button>
+        <div class="cli-divider">ou</div>
+        <button class="cli-btn-google" onclick="cli_loginGoogle()">
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuar com Google
+        </button>
+        <p style="text-align:center;font-size:0.8rem;color:var(--cinza);margin-top:6px">
+          Esqueceu a senha? <button onclick="cli_resetSenha()" style="background:none;border:none;color:var(--roxo);font-weight:600;cursor:pointer;font-family:inherit;font-size:inherit">Redefinir</button>
+        </p>
+      </div>
+
+      <!-- Cadastro -->
+      <div id="cliFormCad" style="display:none">
+        <div class="cli-field"><label>Nome completo</label><input type="text" id="cliCadNome" placeholder="Seu nome"/></div>
+        <div class="cli-field"><label>E-mail</label><input type="email" id="cliCadEmail" placeholder="seu@email.com"/></div>
+        <div class="cli-field"><label>Senha</label><input type="password" id="cliCadSenha" placeholder="Mín. 6 caracteres"/></div>
+        <button class="cli-btn-primary" onclick="cli_cadastrar()">Criar conta</button>
+        <div class="cli-divider">ou</div>
+        <button class="cli-btn-google" onclick="cli_loginGoogle()">
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          Continuar com Google
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PERFIL DO CLIENTE -->
+<div class="perfil-overlay" id="perfilOverlay" onclick="if(event.target===this)cli_fecharPerfil()">
+  <div class="perfil-sheet">
+    <div class="perfil-header">
+      <div class="perfil-avatar" id="perfilAvatar">👤</div>
+      <div>
+        <div class="perfil-nome" id="perfilNome">Carregando...</div>
+        <div class="perfil-email" id="perfilEmail"></div>
+      </div>
+      <button class="perfil-close" onclick="cli_fecharPerfil()">✕</button>
+    </div>
+    <div class="perfil-body">
+      <div class="perfil-section">
+        <h4>Dados pessoais</h4>
+        <div class="perfil-field"><label>Nome completo</label><input type="text" id="perfilCampoNome" placeholder="Seu nome"/></div>
+        <div class="perfil-field"><label>Telefone</label><input type="tel" id="perfilCampoTel" placeholder="(27) 99999-9999"/></div>
+      </div>
+      <div class="perfil-section">
+        <h4>Endereço</h4>
+        <div class="perfil-field"><label>CEP</label><input type="text" id="perfilCampoCep" placeholder="00000-000" oninput="cli_buscarCep(this.value)"/></div>
+        <div class="perfil-field"><label>Rua</label><input type="text" id="perfilCampoRua" placeholder="Rua, Av..."/></div>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">
+          <div class="perfil-field"><label>Número</label><input type="text" id="perfilCampoNum" placeholder="Nº"/></div>
+          <div class="perfil-field"><label>Bairro</label><input type="text" id="perfilCampoBairro" placeholder="Bairro"/></div>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+          <div class="perfil-field"><label>Cidade</label><input type="text" id="perfilCampoCidade" placeholder="Cidade"/></div>
+          <div class="perfil-field"><label>Estado</label><input type="text" id="perfilCampoEstado" placeholder="ES" maxlength="2"/></div>
+        </div>
+        <div class="perfil-field"><label>Complemento</label><input type="text" id="perfilCampoComp" placeholder="Apto, bloco..."/></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px">
+        <button class="perfil-btn-save" onclick="cli_salvarPerfil()">💾 Salvar dados</button>
+        <button class="perfil-btn-logout" onclick="cli_logout()">Sair da conta</button>
+      </div>
+      <div class="perfil-section">
+        <h4>Meus pedidos</h4>
+        <div id="perfilPedidos"><p style="color:var(--cinza);font-size:0.85rem">Nenhum pedido ainda.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
